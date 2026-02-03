@@ -72,10 +72,24 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*"
+      "dist/**/*",
+      "!node_modules",
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/bindings/**/*",
+      "node_modules/file-uri-to-path/**/*",
+      "node_modules/@github/**/*",
+      "node_modules/vscode-jsonrpc/**/*",
+      "node_modules/zod/**/*",
+      "node_modules/uuid/**/*"
     ],
     "mac": {
-      "target": "dmg"
-    }
+      "target": "dmg",
+      "icon": "build/icon.icns"
+    },
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/@github/copilot/prebuilds/**/*"
+    ]
   }
 }
