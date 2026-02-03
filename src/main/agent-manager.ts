@@ -1,4 +1,5 @@
 import { v4 as uuid } from 'uuid'
+import { app } from 'electron'
 import { Database } from './database.js'
 import { WorkspaceManager } from './workspace-manager.js'
 import { ConfigManager } from './config-manager.js'
@@ -188,6 +189,11 @@ export class AgentManager {
         fileChanges: active.fileChanges,
         aborted: active.aborted
       })
+
+      // Bounce dock icon on macOS to notify user
+      if (process.platform === 'darwin') {
+        app.dock?.bounce('informational')
+      }
 
       // Mark as having unread if not the currently viewed session
       if (sessionId !== this.viewedSessionId) {
