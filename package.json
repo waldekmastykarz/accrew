@@ -83,7 +83,9 @@
       "node_modules/@github/**/*",
       "node_modules/vscode-jsonrpc/**/*",
       "node_modules/zod/**/*",
-      "node_modules/uuid/**/*"
+      "node_modules/uuid/**/*",
+      "node_modules/electron-updater/**/*",
+      "node_modules/builder-util-runtime/**/*"
     ],
     "mac": {
       "target": "dmg",
