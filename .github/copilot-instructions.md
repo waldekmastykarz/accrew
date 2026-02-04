@@ -16,6 +16,19 @@ Main (Node)                         Renderer (React/Vite)
 └─────────────────────┘             └──────────────────────┘
 ```
 
+## Before You Edit: Read First
+
+**Don't grep-jump into edits. Understand the file first.**
+
+Before modifying any file:
+1. Search the file for `WHY:` comments — these explain decisions that matter
+2. If you find one, understand what problem it's preventing
+3. If editing streaming/state code, re-read the "Streaming vs Database" section above
+
+**STOP — Before any edit, run a search for `WHY:` in the file first. If there are WHY comments, read them. Then proceed.**
+
+Grep is for *finding* code. Understanding requires *reading* code. Skipping context leads to circular bug fixes.
+
 ## Build & Development
 
 ```bash
@@ -78,7 +91,32 @@ Components access the current session's streaming state via:
 const currentStreaming = activeSessionId ? streamingStates.get(activeSessionId) || null : null
 ```
 
-When `agent:done` fires, the session's streaming state is removed from the Map and converts to a persisted `Message`.
+### Streaming vs Database: Two Rendering Paths
+
+**Critical architecture decision — understand this before touching streaming code:**
+
+| Phase | Data Source | Component | Storage |
+|-------|-------------|-----------|---------|
+| In-flight | `streamingStates` Map | `StreamingMessage` | Memory only |
+| Completed | `messages` array | `MessageBubble` | SQLite (source of truth) |
+
+**These paths must never overlap.** If both render the same content, you get duplicates.
+
+**The transition (agent:done):**
+1. Main process saves message to SQLite
+2. Renderer clears streaming state from Map
+3. Renderer calls `loadMessages()` to reload from DB
+4. `StreamingMessage` unmounts, `MessageBubble` renders
+
+**ChatPane filtering:** While streaming, the last assistant message is filtered out of `messages.map()` to prevent overlap if user navigates away and back (which triggers `loadMessages` while streaming continues).
+
+```typescript
+// In ChatPane.tsx — prevents duplicate rendering during streaming
+{(currentStreaming 
+  ? messages.filter((m, i, arr) => !(m.role === 'assistant' && i === arr.length - 1))
+  : messages
+).map((message) => ...)}
+```
 
 ### Types
 
