@@ -71,6 +71,10 @@
   "build": {
     "appId": "com.accrew.app",
     "productName": "Accrew",
+    "publish": {
+      "provider": "github",
+      "releaseType": "release"
+    },
     "directories": {
       "output": "release"
     },
