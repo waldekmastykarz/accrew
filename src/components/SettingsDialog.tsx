@@ -97,20 +97,15 @@ export function SettingsDialog() {
               Workspace Depth
             </label>
             <p className="text-xs text-muted-foreground">
-              How many folder levels deep to look for workspaces ({workspaceDepth} {workspaceDepth === 1 ? 'level' : 'levels'})
+              How many folder levels deep to look for workspaces
             </p>
             <input
-              type="range"
+              type="number"
               min="1"
-              max="5"
               value={workspaceDepth}
-              onChange={(e) => setWorkspaceDepth(parseInt(e.target.value))}
-              className="w-full"
+              onChange={(e) => setWorkspaceDepth(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-20 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>1</span>
-              <span>5</span>
-            </div>
           </div>
 
           {/* Diff font */}

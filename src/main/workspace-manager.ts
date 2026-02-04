@@ -28,21 +28,10 @@ export class WorkspaceManager {
     const workspaces: Workspace[] = []
     await this.collectWorkspaces(this.workspaceFolder, 1, workspaces)
 
-    // Detect duplicate names and qualify them
-    const nameCounts = new Map<string, number>()
+    // Set displayName to relative path for all workspaces (for consistency and clarity)
     for (const ws of workspaces) {
-      nameCounts.set(ws.name, (nameCounts.get(ws.name) || 0) + 1)
-    }
-
-    // Set displayName - use qualified name for duplicates
-    for (const ws of workspaces) {
-      if (nameCounts.get(ws.name)! > 1) {
-        // Get relative path from workspace folder and use parent/name format
-        const relativePath = path.relative(this.workspaceFolder, ws.path)
-        ws.displayName = relativePath.replace(/\\/g, '/')
-      } else {
-        ws.displayName = ws.name
-      }
+      const relativePath = path.relative(this.workspaceFolder, ws.path)
+      ws.displayName = relativePath.replace(/\\/g, '/')
     }
 
     return workspaces.sort((a, b) => a.displayName.localeCompare(b.displayName))
