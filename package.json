@@ -18,7 +18,7 @@
     "package:win": "npm run build && electron-builder --win",
     "package:all": "npm run build && electron-builder --mac --win",
     "postinstall": "electron-builder install-app-deps",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@github/copilot-sdk": "^0.1.21",
@@ -47,11 +47,11 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^25.2.0",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
-    "@types/uuid": "^11.0.0",
     "@vitejs/plugin-react": "^5.1.3",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.2",
@@ -60,9 +60,11 @@
     "eslint": "^9.17.0",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.0",
+    "globals": "^17.3.0",
     "postcss": "^8.4.49",
-    "tailwindcss": "^4.1.18",
+    "tailwindcss": "^3.4.19",
     "typescript": "^5.7.2",
+    "typescript-eslint": "^8.54.0",
     "vite": "^7.3.1",
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6",
