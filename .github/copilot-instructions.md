@@ -22,10 +22,11 @@ Main (Node)                         Renderer (React/Vite)
 npm run dev          # Runs main (tsc --watch) + renderer (vite) concurrently
 npm run build        # Build both: tsc + vite build
 npm start            # Run built app (requires ACCREW_DEV=true for dev mode)
+npm run package      # Build macOS .dmg
 npm run postinstall  # Rebuild native modules (better-sqlite3) for Electron
 ```
 
-**Key**: After `npm install`, always run `npm run postinstall` — `better-sqlite3` needs native rebuild for Electron's Node version.
+**Critical**: After `npm install`, always run `npm run postinstall` — `better-sqlite3` requires native rebuild for Electron's Node version. Without this, you'll get module version mismatch errors.
 
 ## Code Organization Patterns
 
@@ -41,11 +42,23 @@ const session = await window.accrew.session.create(workspace, prompt, sessionId)
 const unsub = window.accrew.on.agentResponse(({ sessionId, content }) => { ... })
 ```
 
-IPC handlers defined in [src/main/index.ts](src/main/index.ts) — search for `ipcMain.handle`.
+IPC handlers defined in `src/main/index.ts` — search for `ipcMain.handle`.
+
+### Session ID Race Condition Prevention
+
+When creating sessions, generate the ID locally in the renderer **before** the IPC call to avoid race conditions with streaming events that arrive before the session response:
+
+```typescript
+const sessionId = crypto.randomUUID()
+set({ activeSessionId: sessionId, streaming: { ... } })  // Set state FIRST
+const session = await window.accrew.session.create(workspace, prompt, sessionId)
+```
+
+See `createSession()` in `src/store.ts` for the full pattern.
 
 ### Streaming State
 
-Agent responses stream via IPC events. The store in [src/store.ts](src/store.ts) manages streaming state:
+Agent responses stream via IPC events. The store in `src/store.ts` manages streaming state:
 - `streaming.thinking` — accumulated thinking/reasoning
 - `streaming.content` — accumulated response text  
 - `streaming.toolCalls` — tool invocations with results
@@ -55,48 +68,49 @@ When `agent:done` fires, streaming state converts to a persisted `Message`.
 
 ### Types
 
-Shared types live in [src/shared/types.ts](src/shared/types.ts) — single source of truth for `Session`, `Message`, `FileChange`, etc. Both processes import from here.
+Shared types live in `src/shared/types.ts` — single source of truth for `Session`, `Message`, `FileChange`, etc. Both processes import from here.
 
 ### Preload Script
 
-**Must be CommonJS** (`.cjs`) — Electron requires it. Don't convert to ESM. Located at [src/main/preload.cjs](src/main/preload.cjs).
+**Must be CommonJS** (`.cjs`) — Electron requires it. Don't convert to ESM. Located at `src/main/preload.cjs`.
 
 ## Key Components
 
 | File | Purpose |
 |------|---------|
 | `src/main/agent-manager.ts` | Session lifecycle, workspace routing, streaming coordination |
-| `src/main/copilot-client.ts` | Wraps `@github/copilot-sdk`, normalizes events to `StreamEvent` |
+| `src/main/copilot-client.ts` | Wraps `@github/copilot-sdk`, normalizes SDK events to `StreamEvent` |
 | `src/main/database.ts` | SQLite via better-sqlite3, WAL mode, stores sessions/messages/file snapshots |
 | `src/store.ts` | Zustand store, IPC event subscriptions, streaming state |
 | `src/components/DiffPane.tsx` | Uses `@pierre/diffs/react` for diff rendering |
 
 ## Conventions
 
-- **Models**: Default agent model is `claude-opus-4-5`; matching uses `gpt-4o-mini` for speed
-- **Config**: Stored at `~/.accrew/config.json` (workspaceFolder, diffFont, diffFontSize)
-- **Database**: Located at Electron's `userData` path (`accrew.db`)
-- **Workspace routing**: `@workspace` explicit mention OR LLM inference from prompt
+- **Models**: Default agent model is `claude-opus-4-5`, configurable via `~/.accrew/config.json`
+- **Config**: Stored at `~/.accrew/config.json` (workspaceFolder, model, diffFont, diffFontSize, sidebarWidth)
+- **Database**: Located at Electron's `userData` path (`~/Library/Application Support/accrew/accrew.db` on macOS)
+- **Workspace routing**: `@workspace` explicit mention OR LLM-based prompt inference (see `matchWorkspace()` in agent-manager)
 
 ## Common Tasks
 
 ### Adding a new IPC handler
 
-1. Add type to `IpcChannels` in [src/shared/types.ts](src/shared/types.ts)
-2. Add handler in `setupIpcHandlers()` in [src/main/index.ts](src/main/index.ts)
-3. Expose in `window.accrew` via [src/main/preload.cjs](src/main/preload.cjs)
-4. Add corresponding method to store in [src/store.ts](src/store.ts)
+1. Add type to `IpcChannels` in `src/shared/types.ts`
+2. Add handler in `setupIpcHandlers()` in `src/main/index.ts`
+3. Expose in `window.accrew` via `src/main/preload.cjs`
+4. Add corresponding method to store in `src/store.ts`
 
 ### Adding a new streaming event type
 
-1. Add to `StreamEvent` type in [src/main/copilot-client.ts](src/main/copilot-client.ts)
+1. Add to `StreamEvent` type in `src/main/copilot-client.ts`
 2. Handle in `normalizeEvent()` method
-3. Emit from `handleStreamEvent()` in [src/main/agent-manager.ts](src/main/agent-manager.ts)
+3. Emit from `handleStreamEvent()` in `src/main/agent-manager.ts`
 4. Add listener in preload + store's `setupEventListeners()`
 
 ## Debugging Tips
 
-- Main process logs go to terminal
+- Main process logs go to terminal (run `npm run dev`)
 - Renderer DevTools open automatically in dev mode (`ACCREW_DEV=true`)
 - SQLite database at `~/Library/Application Support/accrew/accrew.db` (macOS)
 - If native module errors: `npm run postinstall` then restart
+- Stream events debug: add `console.log` in `CopilotClient.normalizeEvent()`
