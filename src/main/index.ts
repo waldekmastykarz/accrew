@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, dialog } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { Database } from './database.js'
@@ -177,6 +178,24 @@ app.whenReady().then(async () => {
   await initializeServices()
   setupIpcHandlers()
   createWindow()
+
+  // Auto-updater (disabled in dev mode)
+  if (!isDev) {
+    autoUpdater.checkForUpdatesAndNotify()
+
+    autoUpdater.on('update-downloaded', (info) => {
+      dialog.showMessageBox({
+        type: 'info',
+        title: 'Update Ready',
+        message: `Version ${info.version} has been downloaded. Restart to install?`,
+        buttons: ['Restart', 'Later']
+      }).then((result) => {
+        if (result.response === 0) {
+          autoUpdater.quitAndInstall()
+        }
+      })
+    })
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
