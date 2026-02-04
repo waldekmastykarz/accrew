@@ -2,6 +2,7 @@
   "name": "accrew",
   "version": "0.1.0",
   "description": "AI Agent Command Center for local coding agents",
+  "author": "Waldek Mastykarz",
   "type": "module",
   "main": "dist/main/index.js",
   "scripts": {
@@ -16,7 +17,7 @@
     "package": "npm run build && electron-builder --mac",
     "package:win": "npm run build && electron-builder --win",
     "package:all": "npm run build && electron-builder --mac --win",
-    "postinstall": "electron-rebuild -f -w better-sqlite3",
+    "postinstall": "electron-builder install-app-deps",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
@@ -45,7 +46,6 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "@electron/rebuild": "^4.0.3",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.2",
