@@ -16,19 +16,6 @@ Main (Node)                         Renderer (React/Vite)
 └─────────────────────┘             └──────────────────────┘
 ```
 
-## Before You Edit: Read First
-
-**Don't grep-jump into edits. Understand the file first.**
-
-Before modifying any file:
-1. Search the file for `WHY:` comments — these explain decisions that matter
-2. If you find one, understand what problem it's preventing
-3. If editing streaming/state code, re-read the "Streaming vs Database" section above
-
-**STOP — Before any edit, run a search for `WHY:` in the file first. If there are WHY comments, read them. Then proceed.**
-
-Grep is for *finding* code. Understanding requires *reading* code. Skipping context leads to circular bug fixes.
-
 ## Build & Development
 
 ```bash
@@ -143,61 +130,9 @@ Shared types live in `src/shared/types.ts` — single source of truth for `Sessi
 - **Database**: Located at Electron's `userData` path (`~/Library/Application Support/accrew/accrew.db` on macOS)
 - **Workspace routing**: `@workspace` explicit mention OR LLM-based prompt inference (see `matchWorkspace()` in agent-manager)
 
-## Code Comments: Document the "Why"
+## Code Comments
 
-**Every non-obvious fix or decision needs a comment explaining WHY, not what.**
-
-When you fix a bug or implement something tricky, add a comment that explains:
-- What problem this code prevents
-- What breaks if someone changes this
-- The root cause that led to this solution
-
-### Before Modifying Code
-
-Before calling any edit tool (replace_string_in_file, multi_replace_string_in_file):
-1. Run `grep_search` for `WHY:` in the target file — reading the file doesn't count
-2. Review any matches
-3. Then proceed with the edit
-
-This step is mandatory even if you've already read the file. Skimming ≠ searching.
-
-### Comment Format
-
-```typescript
-// WHY: [Problem description] — [What breaks without this]
-// Example: "WHY: Session ID must be set BEFORE IPC call — streaming events 
-// arrive immediately and need the ID already in state, otherwise they're orphaned"
-```
-
-### When to Add WHY Comments
-
-Add a WHY comment whenever you:
-- Fix any bug (no exceptions)
-- Change the order of operations
-- Touch code that already has a WHY comment (update or preserve it)
-- Add a workaround or special case
-- Write code that handles timing, async, or race conditions
-
-### Examples
-
-```typescript
-// WHY: Generate ID locally before IPC — streaming events arrive before 
-// session.create() returns, causing orphaned messages if ID isn't set first
-const sessionId = crypto.randomUUID()
-set({ activeSessionId: sessionId })
-
-// WHY: Must be CommonJS — Electron's contextBridge requires CJS for preload
-// Converting to ESM will silently fail to expose the API
-
-// WHY: WAL mode required — without it, concurrent reads during writes block
-// and the UI freezes while agent is streaming
-db.pragma('journal_mode = WAL')
-
-// WHY: streamingStates is a Map keyed by sessionId — parallel sessions each need
-// their own streaming state. A single object gets overwritten, leaking content
-// across sessions when switching views or starting multiple sessions
-streamingStates: new Map<string, StreamingState>()
-```
+This codebase uses `WHY:` comments to document non-obvious decisions. Before editing any file, follow the `edit-accrew-file` skill workflow.
 
 ## Common Tasks
 
