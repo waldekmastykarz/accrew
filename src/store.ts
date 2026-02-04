@@ -11,6 +11,7 @@ interface DiffSelection {
 }
 
 interface StreamingState {
+  sessionId: string  // Track which session this streaming state belongs to
   thinking: string
   content: string
   toolCalls: ToolCall[]
@@ -77,6 +78,10 @@ interface Store {
   setupEventListeners: () => () => void
 }
 
+// Guard against duplicate listener registration (can happen with HMR or React strict mode)
+let listenersSetup = false
+let cleanupFn: (() => void) | null = null
+
 export const useStore = create<Store>((set, get) => ({
   // Theme
   theme: 'light',
@@ -130,7 +135,7 @@ export const useStore = create<Store>((set, get) => ({
     set((state) => ({
       activeSessionId: sessionId,
       messages: [userMessage],
-      streaming: { thinking: '', content: '', toolCalls: [], fileChanges: [] },
+      streaming: { sessionId, thinking: '', content: '', toolCalls: [], fileChanges: [] },
       streamingSessions: new Set([...state.streamingSessions, sessionId])
     }))
     
@@ -206,7 +211,7 @@ export const useStore = create<Store>((set, get) => ({
     }
     set((state) => ({
       messages: [...state.messages, userMessage],
-      streaming: { thinking: '', content: '', toolCalls: [], fileChanges: [] },
+      streaming: { sessionId: activeSessionId, thinking: '', content: '', toolCalls: [], fileChanges: [] },
       streamingSessions: new Set([...state.streamingSessions, activeSessionId])
     }))
 
@@ -304,12 +309,19 @@ export const useStore = create<Store>((set, get) => ({
 
   // Event listeners
   setupEventListeners: () => {
+    // Prevent duplicate registration
+    if (listenersSetup && cleanupFn) {
+      return cleanupFn
+    }
+    
     const unsubscribers: (() => void)[] = []
 
     unsubscribers.push(
       window.accrew.on.agentThinking(({ sessionId, content }) => {
         if (get().aborting) return
-        if (get().activeSessionId === sessionId) {
+        const { activeSessionId, streaming } = get()
+        // Double-check: event must be for active session AND streaming state must belong to this session
+        if (activeSessionId === sessionId && streaming?.sessionId === sessionId) {
           get().appendThinking(content)
         }
       })
@@ -318,7 +330,8 @@ export const useStore = create<Store>((set, get) => ({
     unsubscribers.push(
       window.accrew.on.agentToolCall(({ sessionId, toolCall }) => {
         if (get().aborting) return
-        if (get().activeSessionId === sessionId) {
+        const { activeSessionId, streaming } = get()
+        if (activeSessionId === sessionId && streaming?.sessionId === sessionId) {
           get().addToolCall(toolCall)
         }
       })
@@ -327,7 +340,8 @@ export const useStore = create<Store>((set, get) => ({
     unsubscribers.push(
       window.accrew.on.agentToolResult(({ sessionId, toolCallId, result }) => {
         if (get().aborting) return
-        if (get().activeSessionId === sessionId) {
+        const { activeSessionId, streaming } = get()
+        if (activeSessionId === sessionId && streaming?.sessionId === sessionId) {
           get().updateToolCall(toolCallId, result)
         }
       })
@@ -336,7 +350,8 @@ export const useStore = create<Store>((set, get) => ({
     unsubscribers.push(
       window.accrew.on.agentResponse(({ sessionId, content }) => {
         if (get().aborting) return
-        if (get().activeSessionId === sessionId) {
+        const { activeSessionId, streaming } = get()
+        if (activeSessionId === sessionId && streaming?.sessionId === sessionId) {
           get().appendContent(content)
         }
       })
@@ -345,7 +360,8 @@ export const useStore = create<Store>((set, get) => ({
     unsubscribers.push(
       window.accrew.on.agentFileChange(({ sessionId, change }) => {
         if (get().aborting) return
-        if (get().activeSessionId === sessionId) {
+        const { activeSessionId, streaming } = get()
+        if (activeSessionId === sessionId && streaming?.sessionId === sessionId) {
           get().addFileChange(change)
         }
       })
@@ -360,7 +376,10 @@ export const useStore = create<Store>((set, get) => ({
         const newStreamingSessions = new Set(get().streamingSessions)
         newStreamingSessions.delete(sessionId)
         
-        if (get().activeSessionId === sessionId) {
+        const { activeSessionId, streaming } = get()
+        
+        // Only update UI if this session is active AND streaming state belongs to this session
+        if (activeSessionId === sessionId && streaming?.sessionId === sessionId) {
           // Use the message data from agent-manager (with correct messageId for database lookups)
           if (messageId) {
             const message: Message = {
@@ -381,6 +400,9 @@ export const useStore = create<Store>((set, get) => ({
           } else {
             set({ streaming: null, streamingSessions: newStreamingSessions })
           }
+        } else if (activeSessionId === sessionId) {
+          // Active session but streaming state doesn't match - just clear streaming
+          set({ streaming: null, streamingSessions: newStreamingSessions })
         } else {
           set({ streamingSessions: newStreamingSessions })
         }
@@ -392,7 +414,13 @@ export const useStore = create<Store>((set, get) => ({
         console.error(`Agent error in session ${sessionId}:`, error)
         const newStreamingSessions = new Set(get().streamingSessions)
         newStreamingSessions.delete(sessionId)
-        set({ streaming: null, streamingSessions: newStreamingSessions })
+        // Only clear streaming state if it belongs to the errored session
+        const streaming = get().streaming
+        if (streaming?.sessionId === sessionId) {
+          set({ streaming: null, streamingSessions: newStreamingSessions })
+        } else {
+          set({ streamingSessions: newStreamingSessions })
+        }
       })
     )
 
@@ -425,8 +453,13 @@ export const useStore = create<Store>((set, get) => ({
       })
     )
 
-    return () => {
+    listenersSetup = true
+    cleanupFn = () => {
       unsubscribers.forEach(unsub => unsub())
+      listenersSetup = false
+      cleanupFn = null
     }
+    
+    return cleanupFn
   }
 }))
