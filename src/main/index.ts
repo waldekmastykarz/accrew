@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, dialog, Menu, MenuItemConstructorOptions } from 'electron'
 import electronUpdater from 'electron-updater'
 const { autoUpdater } = electronUpdater
 import path from 'path'
@@ -23,6 +23,9 @@ let configManager: ConfigManager
 // Use ACCREW_DEV env var to determine dev mode
 const isDev = process.env.ACCREW_DEV === 'true'
 
+// Set proper app name (overrides "Electron" in dev mode)
+app.name = 'Accrew'
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -31,6 +34,7 @@ function createWindow() {
     minHeight: 600,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
+    tabbingIdentifier: '', // Disable macOS window tabs (removes Show Tab Bar menu items)
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -175,9 +179,57 @@ function setupIpcHandlers() {
   })
 }
 
+function createMenu() {
+  // Set custom About panel options
+  if (process.platform === 'darwin') {
+    app.setAboutPanelOptions({
+      applicationName: 'Accrew',
+      applicationVersion: app.getVersion(),
+      copyright: '© 2026 Waldek Mastykarz',
+      credits: 'AI Agent Command Center for local coding agents'
+    })
+  }
+
+  const template: MenuItemConstructorOptions[] = [
+    // App menu (macOS only - contains About)
+    ...(process.platform === 'darwin' ? [{
+      label: 'Accrew',
+      submenu: [
+        { role: 'about' as const },
+        { type: 'separator' as const },
+        { role: 'quit' as const }
+      ]
+    }] : []),
+    // Edit menu for copy/paste
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' as const },
+        { role: 'redo' as const },
+        { type: 'separator' as const },
+        { role: 'cut' as const },
+        { role: 'copy' as const },
+        { role: 'paste' as const },
+        { role: 'selectAll' as const }
+      ]
+    },
+    // Developer menu (not named "View" to prevent macOS from adding tab items)
+    {
+      label: 'Developer',
+      submenu: [
+        { label: 'Toggle Developer Tools', role: 'toggleDevTools' as const, accelerator: 'Alt+CmdOrCtrl+I' }
+      ]
+    }
+  ]
+  
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
+}
+
 app.whenReady().then(async () => {
   await initializeServices()
   setupIpcHandlers()
+  createMenu()
   createWindow()
 
   // Auto-updater (disabled in dev mode)
