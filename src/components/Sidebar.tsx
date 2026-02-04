@@ -66,8 +66,13 @@ export function Sidebar() {
 
   const sessionToDelete = sessions.find(s => s.id === deleteConfirmId)
 
-  const recentSessions = sessions.filter(s => s.status !== 'archived' && filterSession(s))
-  const archivedSessions = sessions.filter(s => s.status === 'archived' && filterSession(s))
+  // WHY: Sort by updatedAt descending — most recently active session should appear at top
+  const recentSessions = sessions
+    .filter(s => s.status !== 'archived' && filterSession(s))
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+  const archivedSessions = sessions
+    .filter(s => s.status === 'archived' && filterSession(s))
+    .sort((a, b) => b.updatedAt - a.updatedAt)
 
   return (
     <div className="h-full flex flex-col bg-sidebar pt-14">

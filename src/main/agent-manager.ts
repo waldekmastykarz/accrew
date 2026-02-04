@@ -123,6 +123,14 @@ export class AgentManager {
     }
     this.database.addMessage(userMessage)
 
+    // WHY: Update session timestamp immediately when user sends — moves session
+    // to top of list right away, not after agent responds
+    this.database.updateSession(sessionId, {})
+    const updatedSession = this.database.getSession(sessionId)
+    if (updatedSession) {
+      this.emit('session:updated', { session: updatedSession })
+    }
+
     // Reset streaming state for new assistant message
     const assistantMessageId = uuid()
     active.currentMessageId = assistantMessageId
@@ -198,10 +206,11 @@ export class AgentManager {
         BrowserWindow.getAllWindows()[0]?.flashFrame(true)
       }
 
-      // Mark as having unread if not the currently viewed session
-      if (sessionId !== this.viewedSessionId) {
-        this.database.updateSession(sessionId, { hasUnread: true })
-      }
+      // WHY: Always call updateSession to touch updated_at — this drives
+      // the "most recent first" sort. Only set hasUnread when not viewing.
+      this.database.updateSession(sessionId, 
+        sessionId !== this.viewedSessionId ? { hasUnread: true } : {}
+      )
       const updatedSession = this.database.getSession(sessionId)
       if (updatedSession) {
         this.emit('session:updated', { session: updatedSession })
