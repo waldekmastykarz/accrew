@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, nativeTheme, dialog } from 'electron'
-import { autoUpdater } from 'electron-updater'
+import electronUpdater from 'electron-updater'
+const { autoUpdater } = electronUpdater
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { Database } from './database.js'
