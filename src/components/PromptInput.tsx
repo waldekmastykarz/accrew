@@ -129,9 +129,61 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
           setAutocompleteIndex(i => Math.max(i - 1, 0))
           return
         case 'Enter':
-        case 'Tab':
           e.preventDefault()
           selectWorkspace(filteredWorkspaces[autocompleteIndex])
+          return
+        case 'Tab':
+          e.preventDefault()
+          // Tab completes only until the first `/` for progressive completion
+          const selected = filteredWorkspaces[autocompleteIndex]
+          const cursorPos = inputRef.current?.selectionStart || value.length
+          const beforeCursor = value.slice(0, cursorPos)
+          const afterCursor = value.slice(cursorPos)
+          
+          // Find what's already typed (after @ if present)
+          const typedMatch = beforeCursor.match(/@?(\S*)$/)
+          const alreadyTyped = typedMatch ? typedMatch[1] : ''
+          const hasAtPrefix = typedMatch ? typedMatch[0].startsWith('@') : false
+          const wordStart = cursorPos - (typedMatch ? typedMatch[0].length : 0)
+          
+          // Find the next segment to complete to
+          const displayName = selected.displayName
+          let completeTo = displayName
+          
+          // If there's a `/` after what's typed, complete only to that `/`
+          if (alreadyTyped.length < displayName.length) {
+            const slashIndex = displayName.indexOf('/', alreadyTyped.length)
+            if (slashIndex !== -1) {
+              completeTo = displayName.slice(0, slashIndex + 1)
+            }
+          }
+          
+          const prefix = hasAtPrefix ? '@' : '@'
+          const before = value.slice(0, wordStart)
+          
+          // If we're completing the full name, add a space after
+          const suffix = completeTo === displayName ? ' ' : ''
+          const newValue = `${before}${prefix}${completeTo}${suffix}${afterCursor}`.trim()
+          
+          setValue(newValue)
+          
+          // If completed to full name, close autocomplete
+          if (completeTo === displayName) {
+            setShowAutocomplete(false)
+            setTabTrigger(false)
+            setMentionFilter('')
+          } else {
+            // Update filter to show refined results
+            setMentionFilter(completeTo)
+          }
+          
+          requestAnimationFrame(() => {
+            if (inputRef.current) {
+              inputRef.current.focus()
+              const newCursorPos = wordStart + prefix.length + completeTo.length
+              inputRef.current.setSelectionRange(newCursorPos, newCursorPos)
+            }
+          })
           return
         case 'Escape':
           e.preventDefault()
@@ -146,8 +198,8 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
       const cursorPos = inputRef.current?.selectionStart || value.length
       const beforeCursor = value.slice(0, cursorPos)
       
-      // Get the current word being typed
-      const wordMatch = beforeCursor.match(/(\S*)$/)
+      // Get the current word being typed (may start with @)
+      const wordMatch = beforeCursor.match(/@?(\S*)$/)
       const currentWord = wordMatch ? wordMatch[1] : ''
       
       // Filter workspaces by current word

@@ -296,7 +296,7 @@ function SessionItem({ session, isActive, isStreaming, isArchived, onSelect, onD
               <span>·</span>
             </>
           )}
-          <span>{formatRelativeTime(session.updatedAt)}</span>
+          <span className="whitespace-nowrap">{formatRelativeTime(session.updatedAt)}</span>
         </div>
       </div>
 
