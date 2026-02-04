@@ -97,10 +97,10 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
         }
       })
     } else if (mentionStart !== null) {
-      // @-triggered autocomplete
+      // @-triggered autocomplete: insert at cursor position where @ was typed
       const before = value.slice(0, mentionStart)
       const after = value.slice(mentionStart + 1 + mentionFilter.length)
-      const newValue = `@${workspace.displayName} ${before}${after}`.trim()
+      const newValue = `${before}@${workspace.displayName} ${after}`.trim()
       
       setValue(newValue)
       setShowAutocomplete(false)
@@ -110,8 +110,8 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
       requestAnimationFrame(() => {
         if (inputRef.current) {
           inputRef.current.focus()
-          const len = inputRef.current.value.length
-          inputRef.current.setSelectionRange(len, len)
+          const newCursorPos = mentionStart + workspace.displayName.length + 2 // +2 for @ and space
+          inputRef.current.setSelectionRange(newCursorPos, newCursorPos)
         }
       })
     }
