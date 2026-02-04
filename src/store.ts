@@ -11,7 +11,6 @@ interface DiffSelection {
 }
 
 interface StreamingState {
-  sessionId: string  // Track which session this streaming state belongs to
   thinking: string
   content: string
   toolCalls: ToolCall[]
@@ -46,14 +45,15 @@ interface Store {
   loadMessages: (sessionId: string) => Promise<void>
   sendMessage: (content: string) => Promise<void>
 
-  // Streaming state for active session
-  streaming: StreamingState | null
-  setStreaming: (state: StreamingState | null) => void
-  appendThinking: (content: string) => void
-  appendContent: (content: string) => void
-  addToolCall: (toolCall: ToolCall) => void
-  updateToolCall: (id: string, result: unknown) => void
-  addFileChange: (change: FileChange) => void
+  // Streaming state per session (keyed by sessionId)
+  streamingStates: Map<string, StreamingState>
+  getStreamingForSession: (sessionId: string | null) => StreamingState | null
+  setStreamingForSession: (sessionId: string, state: StreamingState | null) => void
+  appendThinkingForSession: (sessionId: string, content: string) => void
+  appendContentForSession: (sessionId: string, content: string) => void
+  addToolCallForSession: (sessionId: string, toolCall: ToolCall) => void
+  updateToolCallForSession: (sessionId: string, toolCallId: string, result: unknown) => void
+  addFileChangeForSession: (sessionId: string, change: FileChange) => void
 
   // Workspaces
   workspaces: Workspace[]
@@ -78,7 +78,9 @@ interface Store {
   setupEventListeners: () => () => void
 }
 
-// Guard against duplicate listener registration (can happen with HMR or React strict mode)
+// WHY: Guard against duplicate listener registration — HMR and React strict mode
+// can call setupEventListeners multiple times. Without this guard, events fire
+// multiple times causing duplicate messages and cross-session contamination
 let listenersSetup = false
 let cleanupFn: (() => void) | null = null
 
@@ -104,7 +106,9 @@ export const useStore = create<Store>((set, get) => ({
     set({ sessions })
   },
   setActiveSession: async (id) => {
-    set({ activeSessionId: id, streaming: null, selectedDiff: null })
+    // WHY: Must clear messages FIRST before any async calls — otherwise old messages
+    // flash briefly during the IPC roundtrip. Clear immediately, then load new ones.
+    set({ activeSessionId: id, messages: [], selectedDiff: null })
     await window.accrew.session.setViewed(id)
     if (id) {
       await get().loadMessages(id)
@@ -115,8 +119,6 @@ export const useStore = create<Store>((set, get) => ({
           s.id === id ? { ...s, hasUnread: false } : s
         )
       }))
-    } else {
-      set({ messages: [] })
     }
   },
   createSession: async (workspace, prompt) => {
@@ -132,12 +134,16 @@ export const useStore = create<Store>((set, get) => ({
       createdAt: Date.now()
     }
     
-    set((state) => ({
-      activeSessionId: sessionId,
-      messages: [userMessage],
-      streaming: { sessionId, thinking: '', content: '', toolCalls: [], fileChanges: [] },
-      streamingSessions: new Set([...state.streamingSessions, sessionId])
-    }))
+    set((state) => {
+      const newStreamingStates = new Map(state.streamingStates)
+      newStreamingStates.set(sessionId, { thinking: '', content: '', toolCalls: [], fileChanges: [] })
+      return {
+        activeSessionId: sessionId,
+        messages: [userMessage],
+        streamingStates: newStreamingStates,
+        streamingSessions: new Set([...state.streamingSessions, sessionId])
+      }
+    })
     
     // Mark as viewed BEFORE creating session to prevent race with agent completion
     await window.accrew.session.setViewed(sessionId)
@@ -168,8 +174,8 @@ export const useStore = create<Store>((set, get) => ({
     }))
   },
   abortSession: async () => {
-    const { activeSessionId, streaming } = get()
-    if (!activeSessionId || !streaming) return
+    const { activeSessionId, streamingStates } = get()
+    if (!activeSessionId || !streamingStates.has(activeSessionId)) return
     
     // Set aborting state - disables input until abort completes
     set({ aborting: true })
@@ -183,8 +189,10 @@ export const useStore = create<Store>((set, get) => ({
       // Clear streaming and aborting state
       const newStreamingSessions = new Set(get().streamingSessions)
       newStreamingSessions.delete(activeSessionId)
+      const newStreamingStates = new Map(get().streamingStates)
+      newStreamingStates.delete(activeSessionId)
       set({ 
-        streaming: null, 
+        streamingStates: newStreamingStates, 
         streamingSessions: newStreamingSessions,
         aborting: false
       })
@@ -209,48 +217,76 @@ export const useStore = create<Store>((set, get) => ({
       content,
       createdAt: Date.now()
     }
-    set((state) => ({
-      messages: [...state.messages, userMessage],
-      streaming: { sessionId: activeSessionId, thinking: '', content: '', toolCalls: [], fileChanges: [] },
-      streamingSessions: new Set([...state.streamingSessions, activeSessionId])
-    }))
+    set((state) => {
+      const newStreamingStates = new Map(state.streamingStates)
+      newStreamingStates.set(activeSessionId, { thinking: '', content: '', toolCalls: [], fileChanges: [] })
+      return {
+        messages: [...state.messages, userMessage],
+        streamingStates: newStreamingStates,
+        streamingSessions: new Set([...state.streamingSessions, activeSessionId])
+      }
+    })
 
     await window.accrew.session.send(activeSessionId, content)
   },
 
-  // Streaming
-  streaming: null,
-  setStreaming: (streaming) => set({ streaming }),
-  appendThinking: (content) => set((state) => ({
-    streaming: state.streaming 
-      ? { ...state.streaming, thinking: state.streaming.thinking + content }
-      : null
-  })),
-  appendContent: (content) => set((state) => ({
-    streaming: state.streaming
-      ? { ...state.streaming, content: state.streaming.content + content }
-      : null
-  })),
-  addToolCall: (toolCall) => set((state) => ({
-    streaming: state.streaming
-      ? { ...state.streaming, toolCalls: [...state.streaming.toolCalls, toolCall] }
-      : null
-  })),
-  updateToolCall: (id, result) => set((state) => ({
-    streaming: state.streaming
-      ? {
-          ...state.streaming,
-          toolCalls: state.streaming.toolCalls.map(tc =>
-            tc.id === id ? { ...tc, result, status: 'completed' as const } : tc
-          )
-        }
-      : null
-  })),
-  addFileChange: (change) => set((state) => ({
-    streaming: state.streaming
-      ? { ...state.streaming, fileChanges: [...state.streaming.fileChanges, change] }
-      : null
-  })),
+  // WHY: streamingStates is a Map keyed by sessionId — parallel sessions each need
+  // their own streaming state. A single `streaming` object gets overwritten when
+  // creating a new session, causing cross-session content leaking
+  streamingStates: new Map<string, StreamingState>(),
+  getStreamingForSession: (sessionId) => {
+    if (!sessionId) return null
+    return get().streamingStates.get(sessionId) || null
+  },
+  setStreamingForSession: (sessionId, state) => set((s) => {
+    const newStates = new Map(s.streamingStates)
+    if (state) {
+      newStates.set(sessionId, state)
+    } else {
+      newStates.delete(sessionId)
+    }
+    return { streamingStates: newStates }
+  }),
+  appendThinkingForSession: (sessionId, content) => set((state) => {
+    const current = state.streamingStates.get(sessionId)
+    if (!current) return state
+    const newStates = new Map(state.streamingStates)
+    newStates.set(sessionId, { ...current, thinking: current.thinking + content })
+    return { streamingStates: newStates }
+  }),
+  appendContentForSession: (sessionId, content) => set((state) => {
+    const current = state.streamingStates.get(sessionId)
+    if (!current) return state
+    const newStates = new Map(state.streamingStates)
+    newStates.set(sessionId, { ...current, content: current.content + content })
+    return { streamingStates: newStates }
+  }),
+  addToolCallForSession: (sessionId, toolCall) => set((state) => {
+    const current = state.streamingStates.get(sessionId)
+    if (!current) return state
+    const newStates = new Map(state.streamingStates)
+    newStates.set(sessionId, { ...current, toolCalls: [...current.toolCalls, toolCall] })
+    return { streamingStates: newStates }
+  }),
+  updateToolCallForSession: (sessionId, toolCallId, result) => set((state) => {
+    const current = state.streamingStates.get(sessionId)
+    if (!current) return state
+    const newStates = new Map(state.streamingStates)
+    newStates.set(sessionId, {
+      ...current,
+      toolCalls: current.toolCalls.map(tc =>
+        tc.id === toolCallId ? { ...tc, result, status: 'completed' as const } : tc
+      )
+    })
+    return { streamingStates: newStates }
+  }),
+  addFileChangeForSession: (sessionId, change) => set((state) => {
+    const current = state.streamingStates.get(sessionId)
+    if (!current) return state
+    const newStates = new Map(state.streamingStates)
+    newStates.set(sessionId, { ...current, fileChanges: [...current.fileChanges, change] })
+    return { streamingStates: newStates }
+  }),
 
   // Workspaces
   workspaces: [],
@@ -319,10 +355,9 @@ export const useStore = create<Store>((set, get) => ({
     unsubscribers.push(
       window.accrew.on.agentThinking(({ sessionId, content }) => {
         if (get().aborting) return
-        const { activeSessionId, streaming } = get()
-        // Double-check: event must be for active session AND streaming state must belong to this session
-        if (activeSessionId === sessionId && streaming?.sessionId === sessionId) {
-          get().appendThinking(content)
+        // Accumulate for this session if it has streaming state
+        if (get().streamingStates.has(sessionId)) {
+          get().appendThinkingForSession(sessionId, content)
         }
       })
     )
@@ -330,9 +365,8 @@ export const useStore = create<Store>((set, get) => ({
     unsubscribers.push(
       window.accrew.on.agentToolCall(({ sessionId, toolCall }) => {
         if (get().aborting) return
-        const { activeSessionId, streaming } = get()
-        if (activeSessionId === sessionId && streaming?.sessionId === sessionId) {
-          get().addToolCall(toolCall)
+        if (get().streamingStates.has(sessionId)) {
+          get().addToolCallForSession(sessionId, toolCall)
         }
       })
     )
@@ -340,9 +374,8 @@ export const useStore = create<Store>((set, get) => ({
     unsubscribers.push(
       window.accrew.on.agentToolResult(({ sessionId, toolCallId, result }) => {
         if (get().aborting) return
-        const { activeSessionId, streaming } = get()
-        if (activeSessionId === sessionId && streaming?.sessionId === sessionId) {
-          get().updateToolCall(toolCallId, result)
+        if (get().streamingStates.has(sessionId)) {
+          get().updateToolCallForSession(sessionId, toolCallId, result)
         }
       })
     )
@@ -350,9 +383,8 @@ export const useStore = create<Store>((set, get) => ({
     unsubscribers.push(
       window.accrew.on.agentResponse(({ sessionId, content }) => {
         if (get().aborting) return
-        const { activeSessionId, streaming } = get()
-        if (activeSessionId === sessionId && streaming?.sessionId === sessionId) {
-          get().appendContent(content)
+        if (get().streamingStates.has(sessionId)) {
+          get().appendContentForSession(sessionId, content)
         }
       })
     )
@@ -360,51 +392,30 @@ export const useStore = create<Store>((set, get) => ({
     unsubscribers.push(
       window.accrew.on.agentFileChange(({ sessionId, change }) => {
         if (get().aborting) return
-        const { activeSessionId, streaming } = get()
-        if (activeSessionId === sessionId && streaming?.sessionId === sessionId) {
-          get().addFileChange(change)
+        if (get().streamingStates.has(sessionId)) {
+          get().addFileChangeForSession(sessionId, change)
         }
       })
     )
 
     unsubscribers.push(
-      window.accrew.on.agentDone(({ sessionId, messageId, thinking, content, toolCalls, fileChanges }) => {
+      window.accrew.on.agentDone(async ({ sessionId }) => {
         // Skip if we're aborting - the abort handler will clean up
         if (get().aborting) return
         
-        // Remove from streaming sessions
+        // Remove from streaming sessions and streaming states
         const newStreamingSessions = new Set(get().streamingSessions)
         newStreamingSessions.delete(sessionId)
+        const newStreamingStates = new Map(get().streamingStates)
+        newStreamingStates.delete(sessionId)
+        set({ streamingStates: newStreamingStates, streamingSessions: newStreamingSessions })
         
-        const { activeSessionId, streaming } = get()
-        
-        // Only update UI if this session is active AND streaming state belongs to this session
-        if (activeSessionId === sessionId && streaming?.sessionId === sessionId) {
-          // Use the message data from agent-manager (with correct messageId for database lookups)
-          if (messageId) {
-            const message: Message = {
-              id: messageId,
-              sessionId,
-              role: 'assistant',
-              content: content || '',
-              thinking: thinking || undefined,
-              toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
-              fileChanges: fileChanges && fileChanges.length > 0 ? fileChanges : undefined,
-              createdAt: Date.now()
-            }
-            set((state) => ({
-              messages: [...state.messages, message],
-              streaming: null,
-              streamingSessions: newStreamingSessions
-            }))
-          } else {
-            set({ streaming: null, streamingSessions: newStreamingSessions })
-          }
-        } else if (activeSessionId === sessionId) {
-          // Active session but streaming state doesn't match - just clear streaming
-          set({ streaming: null, streamingSessions: newStreamingSessions })
-        } else {
-          set({ streamingSessions: newStreamingSessions })
+        // WHY: Database is the single source of truth for completed messages.
+        // Instead of constructing the message here, just reload from DB.
+        // This eliminates race conditions and duplicate message bugs.
+        const { activeSessionId } = get()
+        if (activeSessionId === sessionId) {
+          await get().loadMessages(sessionId)
         }
       })
     )
@@ -414,13 +425,9 @@ export const useStore = create<Store>((set, get) => ({
         console.error(`Agent error in session ${sessionId}:`, error)
         const newStreamingSessions = new Set(get().streamingSessions)
         newStreamingSessions.delete(sessionId)
-        // Only clear streaming state if it belongs to the errored session
-        const streaming = get().streaming
-        if (streaming?.sessionId === sessionId) {
-          set({ streaming: null, streamingSessions: newStreamingSessions })
-        } else {
-          set({ streamingSessions: newStreamingSessions })
-        }
+        const newStreamingStates = new Map(get().streamingStates)
+        newStreamingStates.delete(sessionId)
+        set({ streamingStates: newStreamingStates, streamingSessions: newStreamingSessions })
       })
     )
 

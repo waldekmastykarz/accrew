@@ -25,9 +25,9 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const autocompleteRef = useRef<HTMLDivElement>(null)
   
-  const { workspaces, streaming, activeSessionId, aborting, abortSession } = useStore()
-  // Only consider streaming if it's for the current session
-  const isStreaming = streaming !== null && streaming.sessionId === activeSessionId
+  const { workspaces, activeSessionId, aborting, abortSession, streamingSessions } = useStore()
+  // Use streamingSessions (Set) for boolean check - more reliable reactivity than Map.has()
+  const isStreaming = activeSessionId ? streamingSessions.has(activeSessionId) : false
 
   // Expose focus method to parent
   useImperativeHandle(ref, () => ({

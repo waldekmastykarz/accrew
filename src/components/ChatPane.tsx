@@ -8,12 +8,13 @@ import { Circle } from 'lucide-react'
 export function ChatPane() {
   const { 
     messages, 
-    streaming, 
     activeSessionId, 
     sessions,
     sidebarCollapsed,
     sendMessage,
-    createSession
+    createSession,
+    streamingStates,
+    streamingSessions
   } = useStore()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -22,13 +23,18 @@ export function ChatPane() {
   const wasStreamingRef = useRef<boolean>(false)
   const activeSession = sessions.find(s => s.id === activeSessionId)
 
+  // Get streaming state for the current session - directly from Map for content display
+  const currentStreaming = activeSessionId ? streamingStates.get(activeSessionId) || null : null
+  // Use streamingSessions (Set) for boolean check - more reliable reactivity than Map.has()
+  const isStreamingThisSession = activeSessionId ? streamingSessions.has(activeSessionId) : false
+
   // Auto-scroll to bottom (instant for streaming, smooth otherwise)
   useEffect(() => {
-    if (streaming) {
+    if (currentStreaming) {
       // Instant scroll during streaming to avoid lag
       messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
     }
-  }, [streaming?.content, streaming?.thinking, streaming?.toolCalls.length])
+  }, [currentStreaming?.content, currentStreaming?.thinking, currentStreaming?.toolCalls.length])
 
   useEffect(() => {
     // Smooth scroll when new messages arrive
@@ -37,13 +43,13 @@ export function ChatPane() {
 
   // Focus input when streaming ends
   useEffect(() => {
-    if (wasStreamingRef.current && !streaming) {
+    if (wasStreamingRef.current && !currentStreaming) {
       requestAnimationFrame(() => {
         promptInputRef.current?.focus()
       })
     }
-    wasStreamingRef.current = !!streaming
-  }, [streaming])
+    wasStreamingRef.current = !!currentStreaming
+  }, [currentStreaming])
 
   const handleSend = async (content: string, workspace?: string) => {
     if (activeSessionId) {
@@ -53,10 +59,10 @@ export function ChatPane() {
     }
   }
 
-  const isEmptyState = messages.length === 0 && !streaming && !activeSessionId
+  const isEmptyState = messages.length === 0 && !currentStreaming && !activeSessionId
 
   const getStatusDisplay = () => {
-    if (streaming) return { color: 'text-violet-500 fill-violet-500', label: 'Working', animate: true }
+    if (currentStreaming) return { color: 'text-violet-500 fill-violet-500', label: 'Working', animate: true }
     if (activeSession?.status === 'active') return { color: 'text-green-500 fill-green-500', label: 'Ready', animate: false }
     if (activeSession?.status === 'error') return { color: 'text-red-500 fill-red-500', label: 'Error', animate: false }
     return { color: 'text-green-500 fill-green-500', label: 'Completed', animate: false }
@@ -93,21 +99,27 @@ export function ChatPane() {
         {isEmptyState ? (
           <div className="flex-1 flex flex-col items-center justify-center px-8 w-full relative">
             <div className="w-full max-w-3xl">
-              <PromptInput ref={promptInputRef} onSend={handleSend} disabled={!!streaming} centered />
+              <PromptInput ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} centered />
             </div>
           </div>
         ) : (
           <>
             <div className="flex-1 py-6 px-8">
-              {messages.map((message) => (
+              {/* WHY: Filter out last assistant message when streaming — StreamingMessage handles
+                  the in-progress response. Without this, navigating away and back during streaming
+                  shows the message twice (once from DB, once from streaming state) */}
+              {(currentStreaming 
+                ? messages.filter((m, i, arr) => !(m.role === 'assistant' && i === arr.length - 1))
+                : messages
+              ).map((message) => (
                 <MessageBubble key={message.id} message={message} />
               ))}
-              {streaming && <StreamingMessage streaming={streaming} />}
+              {currentStreaming && <StreamingMessage streaming={currentStreaming} />}
               <div ref={messagesEndRef} className="h-1" />
             </div>
             {/* Input at bottom when there's content */}
             <div className="border-t border-border/50 p-6 flex-shrink-0">
-              <PromptInput ref={promptInputRef} onSend={handleSend} disabled={!!streaming} />
+              <PromptInput ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} />
             </div>
           </>
         )}
