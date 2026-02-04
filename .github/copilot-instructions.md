@@ -154,15 +154,12 @@ When you fix a bug or implement something tricky, add a comment that explains:
 
 ### Before Modifying Code
 
-**STOP. Check for WHY comments first.**
+Before calling any edit tool (replace_string_in_file, multi_replace_string_in_file):
+1. Run `grep_search` for `WHY:` in the target file — reading the file doesn't count
+2. Review any matches
+3. Then proceed with the edit
 
-Before changing any code:
-1. Read the surrounding context for `// WHY:` comments
-2. If you find one, understand what problem it's preventing
-3. Make sure your change won't reintroduce that problem
-4. If your change conflicts with a WHY comment, either preserve the protection or update the comment to explain the new approach
-
-Ignoring WHY comments is how circular bugs happen.
+This step is mandatory even if you've already read the file. Skimming ≠ searching.
 
 ### Comment Format
 
