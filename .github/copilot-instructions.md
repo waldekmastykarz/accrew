@@ -91,6 +91,50 @@ Shared types live in `src/shared/types.ts` — single source of truth for `Sessi
 - **Database**: Located at Electron's `userData` path (`~/Library/Application Support/accrew/accrew.db` on macOS)
 - **Workspace routing**: `@workspace` explicit mention OR LLM-based prompt inference (see `matchWorkspace()` in agent-manager)
 
+## Code Comments: Document the "Why"
+
+**Every non-obvious fix or decision needs a comment explaining WHY, not what.**
+
+When you fix a bug or implement something tricky, add a comment that explains:
+- What problem this code prevents
+- What breaks if someone changes this
+- The root cause that led to this solution
+
+### Comment Format
+
+```typescript
+// WHY: [Problem description] — [What breaks without this]
+// Example: "WHY: Session ID must be set BEFORE IPC call — streaming events 
+// arrive immediately and need the ID already in state, otherwise they're orphaned"
+```
+
+### When to Add WHY Comments
+
+Add a WHY comment whenever you:
+- Fix any bug (no exceptions)
+- Change the order of operations
+- Touch code that already has a WHY comment (update or preserve it)
+- Add a workaround or special case
+- Write code that handles timing, async, or race conditions
+
+### Examples
+
+```typescript
+// WHY: Generate ID locally before IPC — streaming events arrive before 
+// session.create() returns, causing orphaned messages if ID isn't set first
+const sessionId = crypto.randomUUID()
+set({ activeSessionId: sessionId })
+
+// WHY: Must be CommonJS — Electron's contextBridge requires CJS for preload
+// Converting to ESM will silently fail to expose the API
+
+// WHY: WAL mode required — without it, concurrent reads during writes block
+// and the UI freezes while agent is streaming
+db.pragma('journal_mode = WAL')
+```
+
+**Read existing WHY comments before modifying code. They exist to prevent you from re-introducing bugs.**
+
 ## Common Tasks
 
 ### Adding a new IPC handler
