@@ -14,6 +14,8 @@
     "start": "ACCREW_DEV=true electron .",
     "electron": "npm run build:main && ACCREW_DEV=true electron .",
     "package": "npm run build && electron-builder --mac",
+    "package:win": "npm run build && electron-builder --win",
+    "package:all": "npm run build && electron-builder --mac --win",
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
@@ -85,6 +87,14 @@
     "mac": {
       "target": "dmg",
       "icon": "build/icon.icns"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     },
     "asar": true,
     "asarUnpack": [
