@@ -289,8 +289,17 @@ export class AgentManager {
         break
 
       case 'text':
-        active.content += event.content || ''
-        this.emit('agent:response', { sessionId, content: event.content || '' })
+        // WHY: SDK sends separate assistant.message events per turn. Without separators,
+        // "Let me do that now:" + "Now let me run..." = "now:Now" (missing paragraph break).
+        // Add double newline between chunks when needed for proper markdown paragraphs.
+        const newContent = event.content || ''
+        let separator = ''
+        if (active.content && newContent && !active.content.endsWith('\n') && !newContent.startsWith('\n')) {
+          separator = '\n\n'
+        }
+        active.content += separator + newContent
+        // Emit with separator so renderer stays in sync
+        this.emit('agent:response', { sessionId, content: separator + newContent })
         break
     }
   }

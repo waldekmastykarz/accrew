@@ -46,12 +46,6 @@ export class CopilotClient {
     let done = false
 
     const unsubscribe = this.session.on((event: SessionEvent) => {
-      // Debug: log event types for reasoning events
-      if (event.type.includes('reasoning')) {
-        const data = event.data as { deltaContent?: string; content?: string }
-        console.log('[CopilotClient] Reasoning event:', event.type, (data.deltaContent || data.content || '').substring(0, 50))
-      }
-      
       const normalized = this.normalizeEvent(event)
       if (normalized) {
         events.push(normalized)
