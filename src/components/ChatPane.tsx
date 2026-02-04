@@ -99,7 +99,9 @@ export function ChatPane() {
         {isEmptyState ? (
           <div className="flex-1 flex flex-col items-center justify-center px-8 w-full relative">
             <div className="w-full max-w-3xl">
-              <PromptInput ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} centered />
+              {/* WHY: key forces remount on session switch — without it, local value state
+                  bleeds across sessions because React reuses the component instance */}
+              <PromptInput key="new" ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} centered />
             </div>
           </div>
         ) : (
@@ -119,7 +121,9 @@ export function ChatPane() {
             </div>
             {/* Input at bottom when there's content */}
             <div className="border-t border-border/50 p-6 flex-shrink-0">
-              <PromptInput ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} />
+              {/* WHY: key forces remount on session switch — without it, local value state
+                  bleeds across sessions because React reuses the component instance */}
+              <PromptInput key={activeSessionId} ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} />
             </div>
           </>
         )}
