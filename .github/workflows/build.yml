@@ -68,7 +68,7 @@ jobs:
         run: npm run package
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Accrew-macOS
           path: release/*.dmg
@@ -98,7 +98,7 @@ jobs:
         run: npm run package:win
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Accrew-Windows
           path: release/*.exe
