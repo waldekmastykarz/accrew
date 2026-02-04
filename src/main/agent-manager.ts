@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid'
-import { app } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { Database } from './database.js'
 import { WorkspaceManager } from './workspace-manager.js'
 import { ConfigManager } from './config-manager.js'
@@ -193,6 +193,9 @@ export class AgentManager {
       // Bounce dock icon on macOS to notify user
       if (process.platform === 'darwin') {
         app.dock?.bounce('informational')
+      } else if (process.platform === 'win32') {
+        // Flash taskbar on Windows
+        BrowserWindow.getAllWindows()[0]?.flashFrame(true)
       }
 
       // Mark as having unread if not the currently viewed session
