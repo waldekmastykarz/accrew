@@ -58,13 +58,27 @@ See `createSession()` in `src/store.ts` for the full pattern.
 
 ### Streaming State
 
-Agent responses stream via IPC events. The store in `src/store.ts` manages streaming state:
-- `streaming.thinking` — accumulated thinking/reasoning
-- `streaming.content` — accumulated response text  
-- `streaming.toolCalls` — tool invocations with results
-- `streaming.fileChanges` — file modifications
+Agent responses stream via IPC events. The store in `src/store.ts` manages streaming state **per session** using a Map:
 
-When `agent:done` fires, streaming state converts to a persisted `Message`.
+```typescript
+// WHY: streamingStates is a Map<sessionId, StreamingState> not a single object —
+// multiple sessions can stream in parallel. A single `streaming` object gets
+// overwritten when creating a new session, causing cross-session contamination.
+streamingStates: Map<string, StreamingState>
+```
+
+Each `StreamingState` contains:
+- `thinking` — accumulated thinking/reasoning
+- `content` — accumulated response text  
+- `toolCalls` — tool invocations with results
+- `fileChanges` — file modifications
+
+Components access the current session's streaming state via:
+```typescript
+const currentStreaming = activeSessionId ? streamingStates.get(activeSessionId) || null : null
+```
+
+When `agent:done` fires, the session's streaming state is removed from the Map and converts to a persisted `Message`.
 
 ### Types
 
@@ -100,6 +114,18 @@ When you fix a bug or implement something tricky, add a comment that explains:
 - What breaks if someone changes this
 - The root cause that led to this solution
 
+### Before Modifying Code
+
+**STOP. Check for WHY comments first.**
+
+Before changing any code:
+1. Read the surrounding context for `// WHY:` comments
+2. If you find one, understand what problem it's preventing
+3. Make sure your change won't reintroduce that problem
+4. If your change conflicts with a WHY comment, either preserve the protection or update the comment to explain the new approach
+
+Ignoring WHY comments is how circular bugs happen.
+
 ### Comment Format
 
 ```typescript
@@ -131,9 +157,12 @@ set({ activeSessionId: sessionId })
 // WHY: WAL mode required — without it, concurrent reads during writes block
 // and the UI freezes while agent is streaming
 db.pragma('journal_mode = WAL')
-```
 
-**Read existing WHY comments before modifying code. They exist to prevent you from re-introducing bugs.**
+// WHY: streamingStates is a Map keyed by sessionId — parallel sessions each need
+// their own streaming state. A single object gets overwritten, leaking content
+// across sessions when switching views or starting multiple sessions
+streamingStates: new Map<string, StreamingState>()
+```
 
 ## Common Tasks
 
