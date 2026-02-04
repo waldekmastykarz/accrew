@@ -72,7 +72,7 @@ async function initializeServices() {
   }
   
   const config = configManager.get()
-  workspaceManager = new WorkspaceManager(config.workspaceFolder)
+  workspaceManager = new WorkspaceManager(config.workspaceFolder, config.workspaceDepth)
   
   agentManager = new AgentManager(database, workspaceManager, configManager, (event, data) => {
     mainWindow?.webContents.send(event, data)
@@ -145,6 +145,9 @@ function setupIpcHandlers() {
     configManager.set(config)
     if (config.workspaceFolder) {
       workspaceManager.setWorkspaceFolder(config.workspaceFolder)
+    }
+    if (config.workspaceDepth !== undefined) {
+      workspaceManager.setDepth(config.workspaceDepth)
     }
     return configManager.get()
   })

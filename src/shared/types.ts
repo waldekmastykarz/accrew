@@ -40,6 +40,7 @@ export interface Message {
 
 export interface Workspace {
   name: string
+  displayName: string // Qualified name when duplicates exist (e.g., "parent/name")
   path: string
   logo: string | null
   readme?: string
@@ -48,9 +49,11 @@ export interface Workspace {
 
 export interface Config {
   workspaceFolder: string
+  workspaceDepth: number
   diffFont: string
   diffFontSize: number
   sidebarWidth: number
+  model: string
 }
 
 export interface WorkspaceMatch {

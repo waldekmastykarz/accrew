@@ -263,8 +263,8 @@ export const useStore = create<Store>((set, get) => ({
   updateConfig: async (updates) => {
     const config = await window.accrew.config.set(updates)
     set({ config })
-    // Reload workspaces if folder changed
-    if (updates.workspaceFolder) {
+    // Reload workspaces if folder or depth changed
+    if (updates.workspaceFolder || updates.workspaceDepth !== undefined) {
       await get().loadWorkspaces()
     }
   },

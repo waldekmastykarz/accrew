@@ -10,6 +10,7 @@ interface ModelInfo {
 export function SettingsDialog() {
   const { settingsOpen, setSettingsOpen, config, updateConfig } = useStore()
   const [workspaceFolder, setWorkspaceFolder] = useState('')
+  const [workspaceDepth, setWorkspaceDepth] = useState(1)
   const [diffFont, setDiffFont] = useState('')
   const [diffFontSize, setDiffFontSize] = useState(13)
   const [model, setModel] = useState('')
@@ -18,6 +19,7 @@ export function SettingsDialog() {
   useEffect(() => {
     if (config) {
       setWorkspaceFolder(config.workspaceFolder)
+      setWorkspaceDepth(config.workspaceDepth)
       setDiffFont(config.diffFont)
       setDiffFontSize(config.diffFontSize)
       setModel(config.model)
@@ -40,6 +42,7 @@ export function SettingsDialog() {
   const handleSave = async () => {
     await updateConfig({
       workspaceFolder,
+      workspaceDepth,
       diffFont,
       diffFontSize,
       model
@@ -86,6 +89,28 @@ export function SettingsDialog() {
               placeholder="/Users/you/github"
               className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
+          </div>
+
+          {/* Workspace depth */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              Workspace Depth
+            </label>
+            <p className="text-xs text-muted-foreground">
+              How many folder levels deep to look for workspaces ({workspaceDepth} {workspaceDepth === 1 ? 'level' : 'levels'})
+            </p>
+            <input
+              type="range"
+              min="1"
+              max="5"
+              value={workspaceDepth}
+              onChange={(e) => setWorkspaceDepth(parseInt(e.target.value))}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>1</span>
+              <span>5</span>
+            </div>
           </div>
 
           {/* Diff font */}

@@ -19,6 +19,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
   const [autocompleteIndex, setAutocompleteIndex] = useState(0)
   const [mentionStart, setMentionStart] = useState<number | null>(null)
   const [mentionFilter, setMentionFilter] = useState('')
+  const [tabTrigger, setTabTrigger] = useState(false) // Track if autocomplete was triggered by Tab
   const [sending, setSending] = useState(false)
   
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -37,7 +38,8 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
   // Memoize filtered workspaces
   const filteredWorkspaces = useMemo(() => 
     workspaces.filter(w =>
-      w.name.toLowerCase().includes(mentionFilter.toLowerCase())
+      w.name.toLowerCase().includes(mentionFilter.toLowerCase()) ||
+      w.displayName.toLowerCase().includes(mentionFilter.toLowerCase())
     ).slice(0, 8), // Limit to 8 results for performance
     [workspaces, mentionFilter]
   )
@@ -68,26 +70,52 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
     setMentionFilter('')
   }, [])
 
-  const selectWorkspace = useCallback((workspace: { name: string }) => {
-    if (mentionStart === null) return
-    
-    const before = value.slice(0, mentionStart)
-    const after = value.slice(mentionStart + 1 + mentionFilter.length)
-    const newValue = `@${workspace.name} ${before}${after}`.trim()
-    
-    setValue(newValue)
-    setShowAutocomplete(false)
-    setMentionStart(null)
-    setMentionFilter('')
-    
-    requestAnimationFrame(() => {
-      if (inputRef.current) {
-        inputRef.current.focus()
-        const len = inputRef.current.value.length
-        inputRef.current.setSelectionRange(len, len)
-      }
-    })
-  }, [mentionStart, mentionFilter, value])
+  const selectWorkspace = useCallback((workspace: { name: string; displayName: string }) => {
+    if (tabTrigger) {
+      // Tab-triggered autocomplete: replace current word with @displayName
+      const cursorPos = inputRef.current?.selectionStart || value.length
+      const beforeCursor = value.slice(0, cursorPos)
+      const afterCursor = value.slice(cursorPos)
+      
+      // Find start of current word (text being typed)
+      const wordMatch = beforeCursor.match(/(\S*)$/)
+      const wordStart = wordMatch ? cursorPos - wordMatch[1].length : cursorPos
+      
+      const before = value.slice(0, wordStart)
+      const newValue = `${before}@${workspace.displayName} ${afterCursor}`.trim()
+      
+      setValue(newValue)
+      setShowAutocomplete(false)
+      setTabTrigger(false)
+      setMentionFilter('')
+      
+      requestAnimationFrame(() => {
+        if (inputRef.current) {
+          inputRef.current.focus()
+          const newCursorPos = wordStart + workspace.displayName.length + 2 // +2 for @ and space
+          inputRef.current.setSelectionRange(newCursorPos, newCursorPos)
+        }
+      })
+    } else if (mentionStart !== null) {
+      // @-triggered autocomplete
+      const before = value.slice(0, mentionStart)
+      const after = value.slice(mentionStart + 1 + mentionFilter.length)
+      const newValue = `@${workspace.displayName} ${before}${after}`.trim()
+      
+      setValue(newValue)
+      setShowAutocomplete(false)
+      setMentionStart(null)
+      setMentionFilter('')
+      
+      requestAnimationFrame(() => {
+        if (inputRef.current) {
+          inputRef.current.focus()
+          const len = inputRef.current.value.length
+          inputRef.current.setSelectionRange(len, len)
+        }
+      })
+    }
+  }, [mentionStart, mentionFilter, value, tabTrigger])
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (showAutocomplete && filteredWorkspaces.length > 0) {
@@ -108,7 +136,33 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
         case 'Escape':
           e.preventDefault()
           setShowAutocomplete(false)
+          setTabTrigger(false)
           return
+      }
+    }
+
+    // Tab key triggers autocomplete based on current word
+    if (e.key === 'Tab' && !showAutocomplete && !e.shiftKey) {
+      const cursorPos = inputRef.current?.selectionStart || value.length
+      const beforeCursor = value.slice(0, cursorPos)
+      
+      // Get the current word being typed
+      const wordMatch = beforeCursor.match(/(\S*)$/)
+      const currentWord = wordMatch ? wordMatch[1] : ''
+      
+      // Filter workspaces by current word
+      const matches = workspaces.filter(w =>
+        w.name.toLowerCase().includes(currentWord.toLowerCase()) ||
+        w.displayName.toLowerCase().includes(currentWord.toLowerCase())
+      ).slice(0, 8)
+      
+      if (matches.length > 0) {
+        e.preventDefault()
+        setMentionFilter(currentWord)
+        setShowAutocomplete(true)
+        setAutocompleteIndex(0)
+        setTabTrigger(true)
+        return
       }
     }
 
@@ -116,7 +170,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
       e.preventDefault()
       handleSubmit()
     }
-  }, [showAutocomplete, filteredWorkspaces, autocompleteIndex, selectWorkspace])
+  }, [showAutocomplete, filteredWorkspaces, autocompleteIndex, selectWorkspace, value, workspaces])
 
   const handleSubmit = useCallback(async () => {
     const trimmed = value.trim()
@@ -181,7 +235,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
         >
           {filteredWorkspaces.map((workspace, index) => (
             <button
-              key={workspace.name}
+              key={workspace.path}
               className={cn(
                 'w-full flex items-center gap-3 px-3 py-2.5 text-left',
                 index === autocompleteIndex ? 'bg-accent' : 'hover:bg-muted/50'
@@ -192,7 +246,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
               <div className="w-6 h-6 rounded bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
                 {workspace.name[0].toUpperCase()}
               </div>
-              <span className="text-sm font-medium truncate">{workspace.name}</span>
+              <span className="text-sm font-medium truncate">{workspace.displayName}</span>
             </button>
           ))}
         </div>

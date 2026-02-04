@@ -5,6 +5,7 @@ import type { Config } from './types.js'
 
 const DEFAULT_CONFIG: Config = {
   workspaceFolder: path.join(os.homedir(), 'github'),
+  workspaceDepth: 1,
   diffFont: 'ui-monospace',
   diffFontSize: 13,
   sidebarWidth: 256,

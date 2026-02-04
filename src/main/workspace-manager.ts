@@ -5,13 +5,19 @@ import type { Workspace } from './types.js'
 
 export class WorkspaceManager {
   private workspaceFolder: string
+  private depth: number
 
-  constructor(workspaceFolder: string) {
+  constructor(workspaceFolder: string, depth: number = 1) {
     this.workspaceFolder = workspaceFolder
+    this.depth = depth
   }
 
   setWorkspaceFolder(folder: string): void {
     this.workspaceFolder = folder
+  }
+
+  setDepth(depth: number): void {
+    this.depth = depth
   }
 
   async listWorkspaces(): Promise<Workspace[]> {
@@ -19,20 +25,52 @@ export class WorkspaceManager {
       return []
     }
 
-    const entries = fs.readdirSync(this.workspaceFolder, { withFileTypes: true })
     const workspaces: Workspace[] = []
+    await this.collectWorkspaces(this.workspaceFolder, 1, workspaces)
+
+    // Detect duplicate names and qualify them
+    const nameCounts = new Map<string, number>()
+    for (const ws of workspaces) {
+      nameCounts.set(ws.name, (nameCounts.get(ws.name) || 0) + 1)
+    }
+
+    // Set displayName - use qualified name for duplicates
+    for (const ws of workspaces) {
+      if (nameCounts.get(ws.name)! > 1) {
+        // Get relative path from workspace folder and use parent/name format
+        const relativePath = path.relative(this.workspaceFolder, ws.path)
+        ws.displayName = relativePath.replace(/\\/g, '/')
+      } else {
+        ws.displayName = ws.name
+      }
+    }
+
+    return workspaces.sort((a, b) => a.displayName.localeCompare(b.displayName))
+  }
+
+  private async collectWorkspaces(dir: string, currentDepth: number, workspaces: Workspace[]): Promise<void> {
+    if (currentDepth > this.depth) {
+      return
+    }
+
+    const entries = fs.readdirSync(dir, { withFileTypes: true })
 
     for (const entry of entries) {
       if (!entry.isDirectory() || entry.name.startsWith('.')) {
         continue
       }
 
-      const workspacePath = path.join(this.workspaceFolder, entry.name)
-      const workspace = await this.getWorkspaceDetails(entry.name, workspacePath)
-      workspaces.push(workspace)
+      const workspacePath = path.join(dir, entry.name)
+      
+      if (currentDepth === this.depth) {
+        // At target depth, add as workspace
+        const workspace = await this.getWorkspaceDetails(entry.name, workspacePath)
+        workspaces.push(workspace)
+      } else {
+        // Not at target depth, recurse into subdirectory
+        await this.collectWorkspaces(workspacePath, currentDepth + 1, workspaces)
+      }
     }
-
-    return workspaces.sort((a, b) => a.name.localeCompare(b.name))
   }
 
   async getWorkspace(name: string): Promise<Workspace | null> {
@@ -50,6 +88,7 @@ export class WorkspaceManager {
 
     return {
       name,
+      displayName: name, // Will be qualified later if duplicates exist
       path: workspacePath,
       logo: logo || this.generateIdenticon(name),
       readme: readme?.substring(0, 2000), // Limit for matching
