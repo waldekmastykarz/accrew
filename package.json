@@ -1,6 +1,6 @@
 {
   "name": "accrew",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "AI Agent Command Center for local coding agents",
   "author": "Waldek Mastykarz",
   "type": "module",
@@ -82,7 +82,10 @@
       "dist/**/*"
     ],
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "build/icon.icns",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
