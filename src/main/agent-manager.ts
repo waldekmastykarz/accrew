@@ -68,14 +68,14 @@ export class AgentManager {
       if (match.workspace && match.confidence > 0.7) {
         workspace = match.workspace
         workspacePath = workspace.path
-        workspaceName = workspace.name
+        workspaceName = workspace.displayName
       }
     }
 
     const session: Session = {
       id: sessionId,
       title: 'New conversation',
-      workspace: workspaceName || null,
+      workspace: workspace?.displayName || workspaceName || null,
       workspacePath,
       logo: workspace?.logo || null,
       createdAt: Date.now(),

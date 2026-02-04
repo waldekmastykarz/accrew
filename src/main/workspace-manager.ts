@@ -62,12 +62,23 @@ export class WorkspaceManager {
     }
   }
 
-  async getWorkspace(name: string): Promise<Workspace | null> {
-    const workspacePath = path.join(this.workspaceFolder, name)
-    if (!fs.existsSync(workspacePath)) {
-      return null
+  async getWorkspace(nameOrDisplayName: string): Promise<Workspace | null> {
+    // First try as a relative path (displayName format like "parent/name")
+    const workspacePath = path.join(this.workspaceFolder, nameOrDisplayName)
+    if (fs.existsSync(workspacePath)) {
+      const baseName = path.basename(nameOrDisplayName)
+      const workspace = await this.getWorkspaceDetails(baseName, workspacePath)
+      // Set displayName to the requested path
+      workspace.displayName = nameOrDisplayName.replace(/\\/g, '/')
+      return workspace
     }
-    return this.getWorkspaceDetails(name, workspacePath)
+    
+    // Fall back to searching all workspaces
+    const workspaces = await this.listWorkspaces()
+    return workspaces.find(w => 
+      w.name === nameOrDisplayName || 
+      w.displayName === nameOrDisplayName
+    ) || null
   }
 
   private async getWorkspaceDetails(name: string, workspacePath: string): Promise<Workspace> {
