@@ -14,6 +14,19 @@ import type { Config } from './types.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+// Fix PATH for macOS GUI apps (Finder-launched apps don't inherit shell PATH)
+if (process.platform === 'darwin' && !process.env.ACCREW_DEV) {
+  const additionalPaths = [
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/local/bin',
+    '/usr/local/sbin',
+    `${process.env.HOME}/.local/bin`,
+    `${process.env.HOME}/bin`
+  ].filter(Boolean)
+  process.env.PATH = [...additionalPaths, process.env.PATH].join(':')
+}
+
 let mainWindow: BrowserWindow | null = null
 let database: Database
 let agentManager: AgentManager
