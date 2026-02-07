@@ -78,7 +78,24 @@ export function StreamingMessage({ streaming }: StreamingMessageProps) {
       {/* Content */}
       {streaming.content && (
         <div className="prose prose-sm dark:prose-invert max-w-prose break-words mt-3 text-sm">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              // WHY: Open links in default system browser instead of inside Electron app
+              a: ({ href, children }) => (
+                <a
+                  href={href}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    if (href) window.accrew.shell.openExternal(href)
+                  }}
+                  className="text-blue-500 hover:underline cursor-pointer"
+                >
+                  {children}
+                </a>
+              ),
+            }}
+          >
             {streaming.content}
           </ReactMarkdown>
           <span className="animate-pulse text-muted-foreground">▌</span>

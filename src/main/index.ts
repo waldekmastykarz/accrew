@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, dialog, Menu, MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, dialog, Menu, MenuItemConstructorOptions, shell } from 'electron'
 import electronUpdater from 'electron-updater'
 const { autoUpdater } = electronUpdater
 import path from 'path'

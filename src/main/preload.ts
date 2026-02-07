@@ -1,9 +1,14 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, shell } from 'electron'
 import type { Session, Message, Workspace, Config, WorkspaceMatch, FileChange, ToolCall } from './types.js'
 
 export type AccrewAPI = typeof api
 
 const api = {
+  // Shell operations
+  shell: {
+    // WHY: Open links in default system browser instead of inside Electron app
+    openExternal: (url: string) => shell.openExternal(url),
+  },
   // Session operations
   session: {
     create: (workspace: string | undefined, prompt: string, sessionId: string) => 

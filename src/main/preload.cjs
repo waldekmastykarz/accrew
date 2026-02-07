@@ -1,6 +1,11 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer, shell } = require('electron')
 
 const api = {
+  // Shell operations
+  shell: {
+    // WHY: Open links in default system browser instead of inside Electron app
+    openExternal: (url) => shell.openExternal(url),
+  },
   // Session operations
   session: {
     create: (workspace, prompt, sessionId) => 
