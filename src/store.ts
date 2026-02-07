@@ -743,9 +743,15 @@ export const useStore = create<Store>((set, get) => ({
     )
 
     // WHY: Cmd+R menu item triggers workspace refresh for newly created workspaces (e.g., git worktree)
+    // Also refreshes git info (branch name, hasChanges) for the active session
     unsubscribers.push(
-      window.accrew.on.workspaceRefresh(() => {
+      window.accrew.on.workspaceRefresh(async () => {
         get().loadWorkspaces()
+        const { activeSessionId, sessions } = get()
+        const session = sessions.find(s => s.id === activeSessionId)
+        if (session?.workspacePath) {
+          await get().loadGitInfo(activeSessionId!, session.workspacePath)
+        }
       })
     )
 
