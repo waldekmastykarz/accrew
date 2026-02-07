@@ -175,15 +175,17 @@ export default function App() {
       return
     }
 
-    // Cmd+W: Archive current session
-    if (e.metaKey && e.key === 'w' && activeSessionId) {
+    // Cmd+Shift+A: Archive current session
+    // WHY: ⌘+W conventionally closes tabs — using ⌘+Shift+A avoids accidental archives
+    if (e.metaKey && e.shiftKey && e.key === 'a' && activeSessionId) {
       e.preventDefault()
       archiveSession(activeSessionId)
       return
     }
 
-    // Cmd+L: Focus prompt input
-    if (e.metaKey && e.key === 'l') {
+    // /: Focus prompt input (GitHub/Slack convention)
+    // WHY: / is universal "quick search/focus" — only when not already in a text field
+    if (e.key === '/' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
       e.preventDefault()
       chatPaneRef.current?.focusInput()
       return
