@@ -148,6 +148,10 @@ function setupIpcHandlers() {
     agentManager.setViewedSession(args.sessionId)
   })
 
+  ipcMain.handle('session:regenerate-title', async (_, args: { sessionId: string }) => {
+    return agentManager.regenerateTitle(args.sessionId)
+  })
+
   // Workspace handlers
   ipcMain.handle('workspace:list', async () => {
     return workspaceManager.listWorkspaces()

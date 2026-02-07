@@ -26,6 +26,8 @@ const api = {
       ipcRenderer.invoke('session:archive', { sessionId }) as Promise<Session>,
     unarchive: (sessionId: string) =>
       ipcRenderer.invoke('session:unarchive', { sessionId }) as Promise<Session>,
+    regenerateTitle: (sessionId: string) =>
+      ipcRenderer.invoke('session:regenerate-title', { sessionId }) as Promise<string | null>,
   },
 
   // Workspace operations

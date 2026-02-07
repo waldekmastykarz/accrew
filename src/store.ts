@@ -51,6 +51,7 @@ interface Store {
   deleteSession: (id: string) => Promise<void>
   archiveSession: (id: string) => Promise<void>
   unarchiveSession: (id: string) => Promise<void>
+  regenerateTitle: (id: string) => Promise<string | null>
   abortSession: () => Promise<void>
 
   // Git info per session
@@ -223,6 +224,9 @@ export const useStore = create<Store>((set, get) => ({
     set((state) => ({
       sessions: state.sessions.map(s => s.id === id ? session : s)
     }))
+  },
+  regenerateTitle: async (id) => {
+    return window.accrew.session.regenerateTitle(id)
   },
   abortSession: async () => {
     const { activeSessionId, streamingStates } = get()

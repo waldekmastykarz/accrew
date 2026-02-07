@@ -6,9 +6,10 @@
   "type": "module",
   "main": "dist/main/index.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
-    "dev:main": "tsc -p tsconfig.main.json --watch",
+    "dev": "concurrently -k \"npm run dev:main\" \"npm run dev:renderer\" \"npm run dev:electron\"",
+    "dev:main": "cp src/main/preload.cjs dist/main/ && tsc -p tsconfig.main.json --watch",
     "dev:renderer": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && ACCREW_DEV=true electron .",
     "build": "npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json && cp src/main/preload.cjs dist/main/",
     "build:renderer": "vite build",

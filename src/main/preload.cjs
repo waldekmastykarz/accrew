@@ -23,6 +23,8 @@ const api = {
       ipcRenderer.invoke('session:archive', { sessionId }),
     unarchive: (sessionId) => 
       ipcRenderer.invoke('session:unarchive', { sessionId }),
+    regenerateTitle: (sessionId) =>
+      ipcRenderer.invoke('session:regenerate-title', { sessionId }),
   },
 
   // Workspace operations

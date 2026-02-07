@@ -438,6 +438,46 @@ Respond with just the title, no quotes or punctuation.`
     }
   }
 
+  async regenerateTitle(sessionId: string): Promise<string | null> {
+    const messages = this.database.getMessages(sessionId)
+    const session = this.database.getSession(sessionId)
+    
+    if (messages.length === 0) return null
+
+    try {
+      const config = this.configManager.get()
+      const titleClient = new CopilotClient({
+        workingDirectory: session?.workspacePath || undefined,
+        model: config.model,
+      })
+      await titleClient.init()
+
+      // Use more context for regeneration — up to 10 messages
+      const conversation = messages.slice(0, 10).map(m => `${m.role}: ${m.content.substring(0, 300)}`).join('\n')
+      const titlePrompt = `Generate a short, descriptive title (3-6 words) that captures the main topic of this conversation:
+${conversation}
+
+Respond with just the title, no quotes or punctuation.`
+
+      let title = ''
+      for await (const event of titleClient.chat(titlePrompt)) {
+        if (event.type === 'text') {
+          title += event.content || ''
+        }
+      }
+
+      title = title.trim().substring(0, 50)
+      if (title) {
+        this.database.updateSession(sessionId, { title })
+        this.emit('session:title-updated', { sessionId, title })
+        return title
+      }
+    } catch {
+      // Keep existing title
+    }
+    return null
+  }
+
   private async updateTitleIfNeeded(sessionId: string): Promise<void> {
     const messages = this.database.getMessages(sessionId)
     // Update title every 10 messages
