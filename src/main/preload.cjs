@@ -135,6 +135,11 @@ const api = {
       ipcRenderer.on('workspace:refresh', listener)
       return () => ipcRenderer.removeListener('workspace:refresh', listener)
     },
+    regenerateTitleMenu: (callback) => {
+      const listener = () => callback()
+      ipcRenderer.on('session:regenerate-title-menu', listener)
+      return () => ipcRenderer.removeListener('session:regenerate-title-menu', listener)
+    },
   },
 }
 

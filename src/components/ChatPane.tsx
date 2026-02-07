@@ -1,9 +1,9 @@
-import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react'
+import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { useStore } from '../store'
 import { MessageBubble } from './MessageBubble'
 import { StreamingMessage } from './StreamingMessage'
 import { PromptInput, PromptInputHandle } from './PromptInput'
-import { Circle, GitBranch, FileDiff, RefreshCw } from 'lucide-react'
+import { Circle, GitBranch, FileDiff } from 'lucide-react'
 
 export interface ChatPaneHandle {
   focusInput: () => void
@@ -22,15 +22,13 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
     sessionGitInfo,
     changesPanel,
     openChangesPanel,
-    closeChangesPanel,
-    regenerateTitle
+    closeChangesPanel
   } = useStore()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const promptInputRef = useRef<PromptInputHandle>(null)
   const wasStreamingRef = useRef<boolean>(false)
-  const [regeneratingTitle, setRegeneratingTitle] = useState(false)
   const activeSession = sessions.find(s => s.id === activeSessionId)
   const gitInfo = activeSessionId ? sessionGitInfo[activeSessionId] : null
 
@@ -68,11 +66,6 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
     wasStreamingRef.current = !!currentStreaming
   }, [currentStreaming])
 
-  // Reset regenerating state when session changes
-  useEffect(() => {
-    setRegeneratingTitle(false)
-  }, [activeSessionId])
-
   const handleSend = async (content: string, workspace?: string) => {
     if (activeSessionId) {
       await sendMessage(content)
@@ -99,30 +92,7 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
             {activeSession && (
               <div className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <h2 className="text-sm font-medium truncate">{activeSession.title}</h2>
-                    <button
-                      onMouseDown={(e) => {
-                        e.stopPropagation()
-                        e.preventDefault()
-                      }}
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        setRegeneratingTitle(true)
-                        try {
-                          await regenerateTitle(activeSession.id)
-                        } finally {
-                          setRegeneratingTitle(false)
-                        }
-                      }}
-                      className="relative z-[60] p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground cursor-pointer no-drag disabled:opacity-50"
-                      title="Regenerate title based on conversation"
-                      type="button"
-                      disabled={regeneratingTitle}
-                    >
-                      <RefreshCw className={`w-3 h-3 ${regeneratingTitle ? 'animate-spin' : ''}`} />
-                    </button>
-                  </div>
+                  <h2 className="text-sm font-medium truncate">{activeSession.title}</h2>
                   {activeSession.workspace && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span className="truncate">{activeSession.workspace}</span>

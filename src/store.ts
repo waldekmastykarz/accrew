@@ -755,6 +755,16 @@ export const useStore = create<Store>((set, get) => ({
       })
     )
 
+    // Cmd+Shift+T menu item regenerates active session title
+    unsubscribers.push(
+      window.accrew.on.regenerateTitleMenu(async () => {
+        const { activeSessionId } = get()
+        if (activeSessionId) {
+          await get().regenerateTitle(activeSessionId)
+        }
+      })
+    )
+
     listenersSetup = true
     cleanupFn = () => {
       unsubscribers.forEach(unsub => unsub())

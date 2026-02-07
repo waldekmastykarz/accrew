@@ -266,6 +266,19 @@ function createMenu() {
         }
       ]
     },
+    // Session menu
+    {
+      label: 'Session',
+      submenu: [
+        {
+          label: 'Regenerate Title',
+          accelerator: 'CmdOrCtrl+Shift+T',
+          click: () => {
+            mainWindow?.webContents.send('session:regenerate-title-menu')
+          }
+        }
+      ]
+    },
     // Developer menu (not named "View" to prevent macOS from adding tab items)
     {
       label: 'Developer',
