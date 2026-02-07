@@ -53,6 +53,8 @@ interface Store {
   unarchiveSession: (id: string) => Promise<void>
   regenerateTitle: (id: string) => Promise<string | null>
   abortSession: () => Promise<void>
+  navigateToPreviousSession: () => void
+  navigateToNextSession: () => void
 
   // Git info per session
   sessionGitInfo: Record<string, GitInfo>
@@ -251,6 +253,36 @@ export const useStore = create<Store>((set, get) => ({
         streamingSessions: newStreamingSessions,
         aborting: false
       })
+    }
+  },
+  // WHY: Navigation by recency, not list order — users expect Cmd+[ to go to "previous" (older)
+  // session and Cmd+] to go to "next" (newer). Sessions sorted by updatedAt descending.
+  navigateToPreviousSession: () => {
+    const { sessions, activeSessionId } = get()
+    const recentSessions = sessions.filter(s => s.status !== 'archived').sort((a, b) => b.updatedAt - a.updatedAt)
+    if (recentSessions.length === 0) return
+    if (!activeSessionId) {
+      get().setActiveSession(recentSessions[0].id)
+      return
+    }
+    const currentIndex = recentSessions.findIndex(s => s.id === activeSessionId)
+    const nextIndex = currentIndex + 1
+    if (nextIndex < recentSessions.length) {
+      get().setActiveSession(recentSessions[nextIndex].id)
+    }
+  },
+  navigateToNextSession: () => {
+    const { sessions, activeSessionId } = get()
+    const recentSessions = sessions.filter(s => s.status !== 'archived').sort((a, b) => b.updatedAt - a.updatedAt)
+    if (recentSessions.length === 0) return
+    if (!activeSessionId) {
+      get().setActiveSession(recentSessions[0].id)
+      return
+    }
+    const currentIndex = recentSessions.findIndex(s => s.id === activeSessionId)
+    const prevIndex = currentIndex - 1
+    if (prevIndex >= 0) {
+      get().setActiveSession(recentSessions[prevIndex].id)
     }
   },
 

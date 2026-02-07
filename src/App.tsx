@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { useStore } from './store'
-import { Sidebar } from './components/Sidebar'
-import { ChatPane } from './components/ChatPane'
+import { Sidebar, SidebarHandle } from './components/Sidebar'
+import { ChatPane, ChatPaneHandle } from './components/ChatPane'
 import { ChangesPanel } from './components/ChangesPanel'
 import { SettingsDialog } from './components/SettingsDialog'
 import { PanelLeft, PanelLeftClose } from 'lucide-react'
@@ -25,8 +25,22 @@ export default function App() {
     setupEventListeners,
     setActiveSession,
     setSidebarWidth,
-    setChangesPanelWidth
+    setChangesPanelWidth,
+    setSettingsOpen,
+    openChangesPanel,
+    closeChangesPanel,
+    loadChangedFiles,
+    activeSessionId,
+    streamingSessions,
+    abortSession,
+    archiveSession,
+    navigateToPreviousSession,
+    navigateToNextSession
   } = useStore()
+
+  // Refs for child component handles
+  const sidebarRef = useRef<SidebarHandle>(null)
+  const chatPaneRef = useRef<ChatPaneHandle>(null)
 
   // Sidebar resize state
   const [isSidebarDragging, setIsSidebarDragging] = useState(false)
@@ -97,12 +111,99 @@ export default function App() {
 
   // Global keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const isStreaming = activeSessionId ? streamingSessions.has(activeSessionId) : false
+
+    // Escape: Stop generating (only when streaming)
+    if (e.key === 'Escape' && isStreaming) {
+      e.preventDefault()
+      abortSession()
+      return
+    }
+
     // Cmd+N: New session
     if (e.metaKey && e.key === 'n') {
       e.preventDefault()
       setActiveSession(null)
+      return
     }
-  }, [setActiveSession])
+
+    // Cmd+B: Toggle sidebar
+    if (e.metaKey && e.key === 'b') {
+      e.preventDefault()
+      toggleSidebar()
+      return
+    }
+
+    // Cmd+\: Toggle changes panel
+    if (e.metaKey && e.key === '\\') {
+      e.preventDefault()
+      if (changesPanel.open) {
+        closeChangesPanel()
+      } else {
+        openChangesPanel()
+      }
+      return
+    }
+
+    // Cmd+,: Open settings
+    if (e.metaKey && e.key === ',') {
+      e.preventDefault()
+      setSettingsOpen(true)
+      return
+    }
+
+    // Cmd+]: Next session (more recent)
+    if (e.metaKey && e.key === ']') {
+      e.preventDefault()
+      navigateToNextSession()
+      return
+    }
+
+    // Cmd+[: Previous session (older)
+    if (e.metaKey && e.key === '[') {
+      e.preventDefault()
+      navigateToPreviousSession()
+      return
+    }
+
+    // Cmd+K: Focus sidebar filter
+    if (e.metaKey && e.key === 'k') {
+      e.preventDefault()
+      if (sidebarCollapsed) toggleSidebar()
+      sidebarRef.current?.focusFilter()
+      return
+    }
+
+    // Cmd+W: Archive current session
+    if (e.metaKey && e.key === 'w' && activeSessionId) {
+      e.preventDefault()
+      archiveSession(activeSessionId)
+      return
+    }
+
+    // Cmd+L: Focus prompt input
+    if (e.metaKey && e.key === 'l') {
+      e.preventDefault()
+      chatPaneRef.current?.focusInput()
+      return
+    }
+
+    // Cmd+J: Scroll to latest message
+    if (e.metaKey && e.key === 'j') {
+      e.preventDefault()
+      chatPaneRef.current?.scrollToBottom()
+      return
+    }
+
+    // Cmd+Shift+R: Refresh changes
+    if (e.metaKey && e.shiftKey && e.key === 'r' && activeSessionId) {
+      e.preventDefault()
+      loadChangedFiles(activeSessionId)
+      return
+    }
+  }, [setActiveSession, toggleSidebar, changesPanel.open, closeChangesPanel, openChangesPanel, 
+      setSettingsOpen, navigateToNextSession, navigateToPreviousSession, sidebarCollapsed,
+      activeSessionId, archiveSession, loadChangedFiles, abortSession, streamingSessions])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -184,7 +285,7 @@ export default function App() {
         }`}
         style={sidebarCollapsed ? undefined : { width: localSidebarWidth }}
       >
-        <Sidebar />
+        <Sidebar ref={sidebarRef} />
         {/* Resize handle */}
         {!sidebarCollapsed && (
           <div
@@ -196,7 +297,7 @@ export default function App() {
       
       {/* Main chat area */}
       <div className="flex-1 min-w-0 w-full">
-        <ChatPane />
+        <ChatPane ref={chatPaneRef} />
       </div>
       
       {/* Changes panel */}

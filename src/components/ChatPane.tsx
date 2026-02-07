@@ -1,16 +1,20 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react'
 import { useStore } from '../store'
 import { MessageBubble } from './MessageBubble'
 import { StreamingMessage } from './StreamingMessage'
 import { PromptInput, PromptInputHandle } from './PromptInput'
 import { Circle, GitBranch, FileDiff, RefreshCw } from 'lucide-react'
 
-export function ChatPane() {
+export interface ChatPaneHandle {
+  focusInput: () => void
+  scrollToBottom: () => void
+}
+
+export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
   const { 
     messages, 
     activeSessionId, 
     sessions,
-    sidebarCollapsed,
     sendMessage,
     createSession,
     streamingStates,
@@ -29,6 +33,12 @@ export function ChatPane() {
   const [regeneratingTitle, setRegeneratingTitle] = useState(false)
   const activeSession = sessions.find(s => s.id === activeSessionId)
   const gitInfo = activeSessionId ? sessionGitInfo[activeSessionId] : null
+
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    focusInput: () => promptInputRef.current?.focus(),
+    scrollToBottom: () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }), [])
 
   // Get streaming state for the current session - directly from Map for content display
   const currentStreaming = activeSessionId ? streamingStates.get(activeSessionId) || null : null
@@ -193,4 +203,4 @@ export function ChatPane() {
       </div>
     </div>
   )
-}
+})

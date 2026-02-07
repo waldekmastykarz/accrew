@@ -15,9 +15,13 @@ import {
   Filter,
   X
 } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 
-export function Sidebar() {
+export interface SidebarHandle {
+  focusFilter: () => void
+}
+
+export const Sidebar = forwardRef<SidebarHandle>(function Sidebar(_, ref) {
   const { 
     sessions, 
     activeSessionId, 
@@ -34,6 +38,14 @@ export function Sidebar() {
   const [filterText, setFilterText] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
   const filterInputRef = useRef<HTMLInputElement>(null)
+
+  // Expose focusFilter method to parent via ref
+  useImperativeHandle(ref, () => ({
+    focusFilter: () => {
+      setFilterOpen(true)
+      // Focus is handled by useEffect when filterOpen changes
+    }
+  }), [])
 
   useEffect(() => {
     if (filterOpen && filterInputRef.current) {
@@ -238,7 +250,7 @@ export function Sidebar() {
       )}
     </div>
   )
-}
+})
 
 interface SessionItemProps {
   session: {
