@@ -284,6 +284,19 @@ function createMenu() {
         }
       ]
     },
+    // View menu
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Toggle Word Wrap',
+          accelerator: 'Alt+Z',
+          click: () => {
+            mainWindow?.webContents.send('view:toggle-word-wrap')
+          }
+        }
+      ]
+    },
     // Developer menu (not named "View" to prevent macOS from adding tab items)
     {
       label: 'Developer',

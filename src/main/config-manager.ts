@@ -8,6 +8,7 @@ const DEFAULT_CONFIG: Config = {
   workspaceDepth: 1,
   diffFont: 'ui-monospace',
   diffFontSize: 13,
+  diffWordWrap: false,
   sidebarWidth: 256,
   changesPanelWidth: 500,
   changesFileListHeight: 200,

@@ -49,6 +49,9 @@ interface Store {
   setChangesPanelWidth: (width: number) => Promise<void>
   setChangesFileListHeight: (height: number) => Promise<void>
 
+  // Diff word wrap
+  toggleDiffWordWrap: () => Promise<void>
+
   // Sessions
   sessions: Session[]
   activeSessionId: string | null
@@ -154,6 +157,12 @@ export const useStore = create<Store>((set, get) => ({
   },
   setChangesFileListHeight: async (height) => {
     await get().updateConfig({ changesFileListHeight: height })
+  },
+
+  // Diff word wrap
+  toggleDiffWordWrap: async () => {
+    const current = get().config?.diffWordWrap ?? false
+    await get().updateConfig({ diffWordWrap: !current })
   },
 
   // Sessions
@@ -806,6 +815,13 @@ export const useStore = create<Store>((set, get) => ({
         if (activeSessionId) {
           await get().regenerateTitle(activeSessionId)
         }
+      })
+    )
+
+    // View > Toggle Word Wrap menu item
+    unsubscribers.push(
+      window.accrew.on.toggleDiffWordWrap(() => {
+        get().toggleDiffWordWrap()
       })
     )
 

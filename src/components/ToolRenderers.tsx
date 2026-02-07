@@ -136,7 +136,7 @@ function TerminalToolCall({ toolCall, isStreaming }: { toolCall: ToolCall, isStr
 // Edit tool renderer with inline diff using @pierre/diffs
 function EditToolCall({ toolCall, isStreaming }: { toolCall: ToolCall, isStreaming?: boolean }) {
   const [showDetails, setShowDetails] = useState(true)
-  const { theme } = useStore()
+  const { theme, config } = useStore()
   const args = toolCall.arguments as Record<string, unknown>
   const filePath = (args?.path || args?.filePath || args?.file_path || '') as string
   const fileName = filePath.split('/').pop() || filePath
@@ -178,6 +178,7 @@ function EditToolCall({ toolCall, isStreaming }: { toolCall: ToolCall, isStreami
               diffStyle: 'unified',
               disableFileHeader: true,
               expandUnchanged: false,
+              overflow: config?.diffWordWrap ? 'wrap' : 'scroll',
             }}
           />
         </div>

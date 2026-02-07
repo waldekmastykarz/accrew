@@ -68,6 +68,7 @@ export interface Config {
   workspaceDepth: number
   diffFont: string
   diffFontSize: number
+  diffWordWrap: boolean
   sidebarWidth: number
   changesPanelWidth: number
   changesFileListHeight: number

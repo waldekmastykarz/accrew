@@ -142,6 +142,11 @@ const api = {
       ipcRenderer.on('session:regenerate-title-menu', listener)
       return () => ipcRenderer.removeListener('session:regenerate-title-menu', listener)
     },
+    toggleDiffWordWrap: (callback) => {
+      const listener = () => callback()
+      ipcRenderer.on('view:toggle-word-wrap', listener)
+      return () => ipcRenderer.removeListener('view:toggle-word-wrap', listener)
+    },
   },
 }
 

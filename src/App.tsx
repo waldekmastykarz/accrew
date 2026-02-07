@@ -35,7 +35,8 @@ export default function App() {
     abortSession,
     archiveSession,
     navigateToPreviousSession,
-    navigateToNextSession
+    navigateToNextSession,
+    toggleDiffWordWrap
   } = useStore()
 
   // Refs for child component handles
@@ -201,9 +202,17 @@ export default function App() {
       loadChangedFiles(activeSessionId)
       return
     }
+
+    // Alt+Z: Toggle diff word wrap
+    if (e.altKey && e.key === 'z') {
+      e.preventDefault()
+      toggleDiffWordWrap()
+      return
+    }
   }, [setActiveSession, toggleSidebar, changesPanel.open, closeChangesPanel, openChangesPanel, 
       setSettingsOpen, navigateToNextSession, navigateToPreviousSession, sidebarCollapsed,
-      activeSessionId, archiveSession, loadChangedFiles, abortSession, streamingSessions])
+      activeSessionId, archiveSession, loadChangedFiles, abortSession, streamingSessions,
+      toggleDiffWordWrap])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)

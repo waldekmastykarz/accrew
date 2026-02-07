@@ -192,6 +192,7 @@ export function ChangesPanel() {
               themeType: theme,
               diffStyle: 'unified',
               expandUnchanged: false,
+              overflow: config?.diffWordWrap ? 'wrap' : 'scroll',
             }}
           />
         ) : diffType === 'tool' && toolDiffData ? (
@@ -204,6 +205,7 @@ export function ChangesPanel() {
               diffStyle: 'unified',
               disableFileHeader: true,
               expandUnchanged: false,
+              overflow: config?.diffWordWrap ? 'wrap' : 'scroll',
             }}
           />
         ) : (
