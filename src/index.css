@@ -164,8 +164,8 @@ code {
 
 /* Focus visible - only for buttons, not inputs */
 button:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring));
 }
 
 textarea:focus-visible,
