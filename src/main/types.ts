@@ -53,6 +53,8 @@ export interface Config {
   diffFont: string
   diffFontSize: number
   sidebarWidth: number
+  changesPanelWidth: number
+  changesFileListHeight: number
   model: string
 }
 

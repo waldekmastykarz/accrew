@@ -27,6 +27,22 @@ export interface FileChange {
   newContent?: string
 }
 
+export interface GitFileStatus {
+  path: string
+  status: 'A' | 'M' | 'D' | '?'
+}
+
+export interface GitInfo {
+  isRepo: boolean
+  branch: string | null
+  hasChanges: boolean
+}
+
+export interface ChangedFile {
+  path: string
+  status: 'created' | 'modified' | 'deleted' | 'untracked'
+}
+
 export interface Message {
   id: string
   sessionId: string
@@ -53,6 +69,8 @@ export interface Config {
   diffFont: string
   diffFontSize: number
   sidebarWidth: number
+  changesPanelWidth: number
+  changesFileListHeight: number
   model: string
 }
 

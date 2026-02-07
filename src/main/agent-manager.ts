@@ -108,9 +108,26 @@ export class AgentManager {
   }
 
   async sendMessage(sessionId: string, content: string): Promise<void> {
-    const active = this.activeSessions.get(sessionId)
+    let active = this.activeSessions.get(sessionId)
+    
+    // WHY: Lazily initialize active session for existing DB sessions — when app restarts,
+    // sessions exist in DB but not in activeSessions Map. Create tracking entry on first message.
     if (!active) {
-      throw new Error('Session not found')
+      const session = this.database.getSession(sessionId)
+      if (!session) {
+        throw new Error('Session not found')
+      }
+      active = {
+        session,
+        copilotClient: null,
+        currentMessageId: null,
+        thinking: '',
+        toolCalls: [],
+        fileChanges: [],
+        content: '',
+        aborted: false
+      }
+      this.activeSessions.set(sessionId, active)
     }
 
     // Save user message

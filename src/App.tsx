@@ -2,11 +2,14 @@ import { useEffect, useCallback, useState, useRef } from 'react'
 import { useStore } from './store'
 import { Sidebar } from './components/Sidebar'
 import { ChatPane } from './components/ChatPane'
-import { DiffPane } from './components/DiffPane'
+import { ChangesPanel } from './components/ChangesPanel'
 import { SettingsDialog } from './components/SettingsDialog'
 import { PanelLeft, PanelLeftClose } from 'lucide-react'
+
 const MIN_SIDEBAR_WIDTH = 200
 const MAX_SIDEBAR_WIDTH = 400
+const MIN_CHANGES_PANEL_WIDTH = 300
+const MAX_CHANGES_PANEL_WIDTH = 800
 
 export default function App() {
   const { 
@@ -14,48 +17,83 @@ export default function App() {
     setTheme, 
     sidebarCollapsed,
     toggleSidebar,
-    selectedDiff,
+    changesPanel,
     config,
     loadSessions,
     loadWorkspaces,
     loadConfig,
     setupEventListeners,
     setActiveSession,
-    setSidebarWidth
+    setSidebarWidth,
+    setChangesPanelWidth
   } = useStore()
 
-  const [isDragging, setIsDragging] = useState(false)
-  const [localWidth, setLocalWidth] = useState(config?.sidebarWidth ?? 256)
-  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
+  // Sidebar resize state
+  const [isSidebarDragging, setIsSidebarDragging] = useState(false)
+  const [localSidebarWidth, setLocalSidebarWidth] = useState(config?.sidebarWidth ?? 256)
+  const sidebarDragRef = useRef<{ startX: number; startWidth: number } | null>(null)
 
-  // Sync local width with config
+  // Changes panel resize state
+  const [isChangesPanelDragging, setIsChangesPanelDragging] = useState(false)
+  const [localChangesPanelWidth, setLocalChangesPanelWidth] = useState(config?.changesPanelWidth ?? 500)
+  const changesPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null)
+
+  // Sync local widths with config
   useEffect(() => {
     if (config?.sidebarWidth) {
-      setLocalWidth(config.sidebarWidth)
+      setLocalSidebarWidth(config.sidebarWidth)
     }
-  }, [config?.sidebarWidth])
+    if (config?.changesPanelWidth) {
+      setLocalChangesPanelWidth(config.changesPanelWidth)
+    }
+  }, [config?.sidebarWidth, config?.changesPanelWidth])
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  // Sidebar drag handlers
+  const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    setIsDragging(true)
-    dragRef.current = { startX: e.clientX, startWidth: localWidth }
-  }, [localWidth])
+    setIsSidebarDragging(true)
+    sidebarDragRef.current = { startX: e.clientX, startWidth: localSidebarWidth }
+  }, [localSidebarWidth])
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging || !dragRef.current) return
+  const handleSidebarMouseMove = useCallback((e: MouseEvent) => {
+    if (!isSidebarDragging || !sidebarDragRef.current) return
     
-    const delta = e.clientX - dragRef.current.startX
-    const newWidth = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, dragRef.current.startWidth + delta))
-    setLocalWidth(newWidth)
-  }, [isDragging])
+    const delta = e.clientX - sidebarDragRef.current.startX
+    const newWidth = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, sidebarDragRef.current.startWidth + delta))
+    setLocalSidebarWidth(newWidth)
+  }, [isSidebarDragging])
 
-  const handleMouseUp = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false)
-      setSidebarWidth(localWidth)
-      dragRef.current = null
+  const handleSidebarMouseUp = useCallback(() => {
+    if (isSidebarDragging) {
+      setIsSidebarDragging(false)
+      setSidebarWidth(localSidebarWidth)
+      sidebarDragRef.current = null
     }
-  }, [isDragging, localWidth, setSidebarWidth])
+  }, [isSidebarDragging, localSidebarWidth, setSidebarWidth])
+
+  // Changes panel drag handlers
+  const handleChangesPanelMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsChangesPanelDragging(true)
+    changesPanelDragRef.current = { startX: e.clientX, startWidth: localChangesPanelWidth }
+  }, [localChangesPanelWidth])
+
+  const handleChangesPanelMouseMove = useCallback((e: MouseEvent) => {
+    if (!isChangesPanelDragging || !changesPanelDragRef.current) return
+    
+    // Note: negative delta because dragging left increases width
+    const delta = changesPanelDragRef.current.startX - e.clientX
+    const newWidth = Math.min(MAX_CHANGES_PANEL_WIDTH, Math.max(MIN_CHANGES_PANEL_WIDTH, changesPanelDragRef.current.startWidth + delta))
+    setLocalChangesPanelWidth(newWidth)
+  }, [isChangesPanelDragging])
+
+  const handleChangesPanelMouseUp = useCallback(() => {
+    if (isChangesPanelDragging) {
+      setIsChangesPanelDragging(false)
+      setChangesPanelWidth(localChangesPanelWidth)
+      changesPanelDragRef.current = null
+    }
+  }, [isChangesPanelDragging, localChangesPanelWidth, setChangesPanelWidth])
 
   // Global keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -72,19 +110,34 @@ export default function App() {
   }, [handleKeyDown])
 
   useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove)
-      window.addEventListener('mouseup', handleMouseUp)
+    if (isSidebarDragging) {
+      window.addEventListener('mousemove', handleSidebarMouseMove)
+      window.addEventListener('mouseup', handleSidebarMouseUp)
       document.body.style.cursor = 'col-resize'
       document.body.style.userSelect = 'none'
       return () => {
-        window.removeEventListener('mousemove', handleMouseMove)
-        window.removeEventListener('mouseup', handleMouseUp)
+        window.removeEventListener('mousemove', handleSidebarMouseMove)
+        window.removeEventListener('mouseup', handleSidebarMouseUp)
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
       }
     }
-  }, [isDragging, handleMouseMove, handleMouseUp])
+  }, [isSidebarDragging, handleSidebarMouseMove, handleSidebarMouseUp])
+
+  useEffect(() => {
+    if (isChangesPanelDragging) {
+      window.addEventListener('mousemove', handleChangesPanelMouseMove)
+      window.addEventListener('mouseup', handleChangesPanelMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+      return () => {
+        window.removeEventListener('mousemove', handleChangesPanelMouseMove)
+        window.removeEventListener('mouseup', handleChangesPanelMouseUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+    }
+  }, [isChangesPanelDragging, handleChangesPanelMouseMove, handleChangesPanelMouseUp])
 
   useEffect(() => {
     // Initialize theme
@@ -129,14 +182,14 @@ export default function App() {
         className={`flex-shrink-0 transition-sidebar border-r border-border/50 relative ${
           sidebarCollapsed ? 'w-0 opacity-0' : ''
         }`}
-        style={sidebarCollapsed ? undefined : { width: localWidth }}
+        style={sidebarCollapsed ? undefined : { width: localSidebarWidth }}
       >
         <Sidebar />
         {/* Resize handle */}
         {!sidebarCollapsed && (
           <div
             className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 active:bg-primary/30 z-10"
-            onMouseDown={handleMouseDown}
+            onMouseDown={handleSidebarMouseDown}
           />
         )}
       </div>
@@ -146,10 +199,18 @@ export default function App() {
         <ChatPane />
       </div>
       
-      {/* Diff pane */}
-      {selectedDiff && (
-        <div className="flex-shrink-0 w-[500px] border-l border-border">
-          <DiffPane />
+      {/* Changes panel */}
+      {changesPanel.open && (
+        <div 
+          className="flex-shrink-0 border-l border-border relative"
+          style={{ width: localChangesPanelWidth }}
+        >
+          {/* Resize handle - on left side */}
+          <div
+            className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-primary/20 active:bg-primary/30 z-10"
+            onMouseDown={handleChangesPanelMouseDown}
+          />
+          <ChangesPanel />
         </div>
       )}
       

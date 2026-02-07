@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { MessageBubble } from './MessageBubble'
 import { StreamingMessage } from './StreamingMessage'
 import { PromptInput, PromptInputHandle } from './PromptInput'
-import { Circle } from 'lucide-react'
+import { Circle, GitBranch, FileDiff } from 'lucide-react'
 
 export function ChatPane() {
   const { 
@@ -14,7 +14,11 @@ export function ChatPane() {
     sendMessage,
     createSession,
     streamingStates,
-    streamingSessions
+    streamingSessions,
+    sessionGitInfo,
+    changesPanel,
+    openChangesPanel,
+    closeChangesPanel
   } = useStore()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -22,6 +26,7 @@ export function ChatPane() {
   const promptInputRef = useRef<PromptInputHandle>(null)
   const wasStreamingRef = useRef<boolean>(false)
   const activeSession = sessions.find(s => s.id === activeSessionId)
+  const gitInfo = activeSessionId ? sessionGitInfo[activeSessionId] : null
 
   // Get streaming state for the current session - directly from Map for content display
   const currentStreaming = activeSessionId ? streamingStates.get(activeSessionId) || null : null
@@ -79,9 +84,37 @@ export function ChatPane() {
                 <div className="flex-1 min-w-0">
                   <h2 className="text-sm font-medium truncate">{activeSession.title}</h2>
                   {activeSession.workspace && (
-                    <p className="text-xs text-muted-foreground truncate">
-                      {activeSession.workspace}
-                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="truncate">{activeSession.workspace}</span>
+                      {gitInfo?.isRepo && gitInfo.branch ? (
+                        <>
+                          <span className="text-muted-foreground/50">·</span>
+                          <button
+                            onClick={() => changesPanel.open ? closeChangesPanel() : openChangesPanel()}
+                            className={`flex items-center gap-1 hover:text-foreground transition-colors ${
+                              gitInfo.hasChanges ? 'text-orange-500' : ''
+                            }`}
+                            title={gitInfo.hasChanges ? 'View pending changes' : 'Toggle changes panel'}
+                          >
+                            <GitBranch className="w-3 h-3" />
+                            <span className="truncate">{gitInfo.branch}</span>
+                          </button>
+                        </>
+                      ) : !gitInfo?.isRepo && (
+                        <>
+                          <span className="text-muted-foreground/50">·</span>
+                          <button
+                            onClick={() => changesPanel.open ? closeChangesPanel() : openChangesPanel()}
+                            className={`flex items-center gap-1 hover:text-foreground transition-colors ${
+                              changesPanel.files.length > 0 ? 'text-orange-500' : ''
+                            }`}
+                            title={changesPanel.files.length > 0 ? 'View file changes' : 'Toggle changes panel'}
+                          >
+                            <FileDiff className="w-3 h-3" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div className="flex items-center gap-1.5 text-xs">

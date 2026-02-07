@@ -7,6 +7,7 @@ import { Database } from './database.js'
 import { AgentManager } from './agent-manager.js'
 import { WorkspaceManager } from './workspace-manager.js'
 import { ConfigManager } from './config-manager.js'
+import { GitManager } from './git-manager.js'
 import { CopilotClient as SDKCopilotClient } from '@github/copilot-sdk'
 import type { Config } from './types.js'
 
@@ -32,6 +33,7 @@ let database: Database
 let agentManager: AgentManager
 let workspaceManager: WorkspaceManager
 let configManager: ConfigManager
+let gitManager: GitManager
 
 // Use ACCREW_DEV env var to determine dev mode
 const isDev = process.env.ACCREW_DEV === 'true'
@@ -91,6 +93,7 @@ async function initializeServices() {
   
   const config = configManager.get()
   workspaceManager = new WorkspaceManager(config.workspaceFolder, config.workspaceDepth)
+  gitManager = new GitManager()
   
   agentManager = new AgentManager(database, workspaceManager, configManager, (event, data) => {
     mainWindow?.webContents.send(event, data)
@@ -192,6 +195,23 @@ function setupIpcHandlers() {
       console.error('Error listing models:', error)
       return []
     }
+  })
+
+  // Git handlers
+  ipcMain.handle('git:is-repo', async (_, args: { path: string }) => {
+    return gitManager.isRepo(args.path)
+  })
+
+  ipcMain.handle('git:branch', async (_, args: { path: string }) => {
+    return gitManager.getBranch(args.path)
+  })
+
+  ipcMain.handle('git:status', async (_, args: { path: string }) => {
+    return gitManager.getStatus(args.path)
+  })
+
+  ipcMain.handle('git:diff', async (_, args: { path: string; filePath: string }) => {
+    return gitManager.getDiff(args.path, args.filePath)
   })
 }
 

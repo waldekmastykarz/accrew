@@ -53,6 +53,18 @@ const api = {
       ipcRenderer.invoke('file:get-diff', { sessionId, messageId, filePath }),
   },
 
+  // Git operations
+  git: {
+    isRepo: (path) =>
+      ipcRenderer.invoke('git:is-repo', { path }),
+    branch: (path) =>
+      ipcRenderer.invoke('git:branch', { path }),
+    status: (path) =>
+      ipcRenderer.invoke('git:status', { path }),
+    diff: (path, filePath) =>
+      ipcRenderer.invoke('git:diff', { path, filePath }),
+  },
+
   // Theme
   theme: {
     get: () => 

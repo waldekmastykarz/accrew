@@ -9,6 +9,8 @@ const DEFAULT_CONFIG: Config = {
   diffFont: 'ui-monospace',
   diffFontSize: 13,
   sidebarWidth: 256,
+  changesPanelWidth: 500,
+  changesFileListHeight: 200,
   model: 'claude-opus-4-5'
 }
 

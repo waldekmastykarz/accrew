@@ -1,15 +1,10 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { useStore } from '../store'
-import type { Message, ToolCall, FileChange } from '../shared/types'
+import type { Message, ToolCall } from '../shared/types'
 import { 
   Brain, 
-  FilePlus,
-  FileX,
-  FileEdit,
-  Terminal,
-  Eye
+  Terminal
 } from 'lucide-react'
 import { ToolRenderer } from './ToolRenderers'
 
@@ -41,14 +36,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         <ToolCallsList toolCalls={message.toolCalls} />
       )}
 
-      {/* File changes - prominent */}
-      {message.fileChanges && message.fileChanges.length > 0 && (
-        <FileChangesBlock 
-          changes={message.fileChanges} 
-          sessionId={message.sessionId}
-          messageId={message.id}
-        />
-      )}
+      {/* WHY: FileChangesBlock removed — changes now shown in ChangesPanel (right side)
+          instead of inline at end of each message. Tool-level diffs are kept via ToolRenderer */}
 
       {/* Response content */}
       {message.content && (
@@ -106,45 +95,6 @@ function ToolCallsList({ toolCalls }: { toolCalls: ToolCall[] }) {
     <div className="mb-3 space-y-2">
       {toolCalls.map((tc) => (
         <ToolRenderer key={tc.id} toolCall={tc} />
-      ))}
-    </div>
-  )
-}
-
-function FileChangesBlock({ 
-  changes, 
-  sessionId, 
-  messageId 
-}: { 
-  changes: FileChange[]
-  sessionId: string
-  messageId: string
-}) {
-  const { selectDiff } = useStore()
-
-  const getIcon = (type: FileChange['type']) => {
-    switch (type) {
-      case 'created': return <FilePlus className="w-4 h-4 text-green-500" />
-      case 'modified': return <FileEdit className="w-4 h-4 text-yellow-500" />
-      case 'deleted': return <FileX className="w-4 h-4 text-red-500" />
-    }
-  }
-
-  return (
-    <div className="space-y-1 mb-3 no-drag">
-      <p className="text-xs text-muted-foreground mb-2">Files changed</p>
-      {changes.map((change, index) => (
-        <button
-          key={`${change.path}-${index}`}
-          onClick={() => selectDiff(sessionId, messageId, change.path, change.type)}
-          className="no-drag relative z-[60] flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-muted/50 transition-colors text-left group"
-        >
-          {getIcon(change.type)}
-          <span className="font-mono text-xs truncate flex-1">
-            {change.path.split('/').pop()}
-          </span>
-          <Eye className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-        </button>
       ))}
     </div>
   )

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Session, Message, Workspace, Config, FileChange, ToolCall } from './shared/types'
+import type { Session, Message, Workspace, Config, FileChange, ToolCall, GitInfo, ChangedFile } from './shared/types'
 
 interface DiffSelection {
   sessionId: string
@@ -17,6 +17,15 @@ interface StreamingState {
   fileChanges: FileChange[]
 }
 
+interface ChangesPanelState {
+  open: boolean
+  files: ChangedFile[]
+  selectedFile: string | null
+  userClosed: boolean
+  diffContent: string | null  // Raw git diff string or null
+  diffType: 'git' | 'tool' | null  // Source of the diff
+}
+
 interface Store {
   // Theme
   theme: 'light' | 'dark'
@@ -26,6 +35,10 @@ interface Store {
   sidebarCollapsed: boolean
   toggleSidebar: () => void
   setSidebarWidth: (width: number) => Promise<void>
+
+  // Changes panel sizing
+  setChangesPanelWidth: (width: number) => Promise<void>
+  setChangesFileListHeight: (height: number) => Promise<void>
 
   // Sessions
   sessions: Session[]
@@ -39,6 +52,19 @@ interface Store {
   archiveSession: (id: string) => Promise<void>
   unarchiveSession: (id: string) => Promise<void>
   abortSession: () => Promise<void>
+
+  // Git info per session
+  sessionGitInfo: Record<string, GitInfo>
+  loadGitInfo: (sessionId: string, workspacePath: string) => Promise<void>
+  getGitInfoForSession: (sessionId: string | null) => GitInfo | null
+
+  // Changes panel
+  changesPanel: ChangesPanelState
+  loadChangedFiles: (sessionId: string) => Promise<void>
+  selectChangedFile: (filePath: string) => Promise<void>
+  openChangesPanel: () => Promise<void>
+  closeChangesPanel: () => void
+  resetUserClosed: () => void
 
   // Messages
   messages: Message[]
@@ -96,6 +122,14 @@ export const useStore = create<Store>((set, get) => ({
     await get().updateConfig({ sidebarWidth: width })
   },
 
+  // Changes panel sizing
+  setChangesPanelWidth: async (width) => {
+    await get().updateConfig({ changesPanelWidth: width })
+  },
+  setChangesFileListHeight: async (height) => {
+    await get().updateConfig({ changesFileListHeight: height })
+  },
+
   // Sessions
   sessions: [],
   activeSessionId: null,
@@ -108,11 +142,23 @@ export const useStore = create<Store>((set, get) => ({
   setActiveSession: async (id) => {
     // WHY: Must clear messages FIRST before any async calls — otherwise old messages
     // flash briefly during the IPC roundtrip. Clear immediately, then load new ones.
-    set({ activeSessionId: id, messages: [], selectedDiff: null })
+    set({ 
+      activeSessionId: id, 
+      messages: [], 
+      selectedDiff: null,
+      changesPanel: { open: false, files: [], selectedFile: null, userClosed: false, diffContent: null, diffType: null }
+    })
     await window.accrew.session.setViewed(id)
     if (id) {
       await get().loadMessages(id)
       await window.accrew.session.markRead(id)
+      
+      // Load git info for this session's workspace
+      const session = get().sessions.find(s => s.id === id)
+      if (session?.workspacePath) {
+        await get().loadGitInfo(id, session.workspacePath)
+      }
+      
       // Update local state
       set((state) => ({
         sessions: state.sessions.map(s => 
@@ -152,6 +198,11 @@ export const useStore = create<Store>((set, get) => ({
     set((state) => ({
       sessions: [session, ...state.sessions]
     }))
+    
+    // Load git info for newly created session
+    if (session.workspacePath) {
+      await get().loadGitInfo(sessionId, session.workspacePath)
+    }
   },
   deleteSession: async (id) => {
     await window.accrew.session.delete(id)
@@ -198,6 +249,195 @@ export const useStore = create<Store>((set, get) => ({
       })
     }
   },
+
+  // Git info per session
+  // WHY: Using plain object instead of Map for Zustand reactivity — Map.get() doesn't
+  // trigger re-renders when internal contents change, only when reference changes
+  sessionGitInfo: {} as Record<string, GitInfo>,
+  loadGitInfo: async (sessionId, workspacePath) => {
+    const isRepo = await window.accrew.git.isRepo(workspacePath)
+    const branch = isRepo ? await window.accrew.git.branch(workspacePath) : null
+    const status = isRepo ? await window.accrew.git.status(workspacePath) : []
+    const hasChanges = status.length > 0
+    set((state) => ({
+      sessionGitInfo: { ...state.sessionGitInfo, [sessionId]: { isRepo, branch, hasChanges } }
+    }))
+  },
+  getGitInfoForSession: (sessionId) => {
+    if (!sessionId) return null
+    return get().sessionGitInfo[sessionId] || null
+  },
+
+  // Changes panel
+  changesPanel: {
+    open: false,
+    files: [],
+    selectedFile: null,
+    userClosed: false,
+    diffContent: null,
+    diffType: null
+  },
+  loadChangedFiles: async (sessionId) => {
+    const { sessions, streamingStates, changesPanel } = get()
+    const session = sessions.find(s => s.id === sessionId)
+    if (!session?.workspacePath) return
+
+    const gitInfo = get().sessionGitInfo[sessionId]
+    let files: ChangedFile[] = []
+    
+    if (gitInfo?.isRepo) {
+      // Git repo: use git status
+      const gitFiles = await window.accrew.git.status(session.workspacePath)
+      files = gitFiles.map(f => ({
+        path: f.path,
+        status: f.status === 'A' ? 'created' 
+              : f.status === 'D' ? 'deleted'
+              : f.status === '?' ? 'untracked'
+              : 'modified'
+      }))
+      
+      // Update hasChanges in gitInfo
+      set((state) => ({
+        sessionGitInfo: {
+          ...state.sessionGitInfo,
+          [sessionId]: { ...state.sessionGitInfo[sessionId], hasChanges: files.length > 0 }
+        }
+      }))
+    } else {
+      // Non-git: collect file changes from messages and current streaming state
+      // WHY: After agent:done, streamingState is cleared but fileChanges are saved to messages in DB.
+      // Must check both sources to show all changes across the session.
+      const { messages } = get()
+      const sessionMessages = messages.filter(m => m.sessionId === sessionId && m.role === 'assistant')
+      const workspacePath = session.workspacePath || ''
+      
+      // Collect from completed messages
+      const fileMap = new Map<string, ChangedFile>()
+      for (const msg of sessionMessages) {
+        if (msg.fileChanges) {
+          for (const fc of msg.fileChanges) {
+            // WHY: Make path relative to workspace for cleaner display
+            const relativePath = fc.path.startsWith(workspacePath) 
+              ? fc.path.slice(workspacePath.length).replace(/^\//, '')
+              : fc.path
+            fileMap.set(relativePath, {
+              path: relativePath,
+              status: fc.type === 'created' ? 'created'
+                    : fc.type === 'deleted' ? 'deleted'
+                    : 'modified'
+            })
+          }
+        }
+      }
+      
+      // Also check current streaming state (for in-flight changes)
+      const streaming = streamingStates.get(sessionId)
+      if (streaming?.fileChanges) {
+        for (const fc of streaming.fileChanges) {
+          const relativePath = fc.path.startsWith(workspacePath)
+            ? fc.path.slice(workspacePath.length).replace(/^\//, '')
+            : fc.path
+          fileMap.set(relativePath, {
+            path: relativePath,
+            status: fc.type === 'created' ? 'created'
+                  : fc.type === 'deleted' ? 'deleted'
+                  : 'modified'
+          })
+        }
+      }
+      
+      files = Array.from(fileMap.values())
+    }
+
+    // WHY: Clear selection if selected file no longer in list — prevents stale diff showing
+    const selectedStillExists = files.some(f => f.path === changesPanel.selectedFile)
+    set((state) => ({
+      changesPanel: {
+        ...state.changesPanel,
+        files,
+        selectedFile: selectedStillExists ? state.changesPanel.selectedFile : null,
+        diffContent: selectedStillExists ? state.changesPanel.diffContent : null,
+        diffType: selectedStillExists ? state.changesPanel.diffType : null
+      }
+    }))
+  },
+  selectChangedFile: async (filePath) => {
+    const { activeSessionId, sessions, sessionGitInfo, messages } = get()
+    if (!activeSessionId) return
+    
+    const session = sessions.find(s => s.id === activeSessionId)
+    if (!session?.workspacePath) return
+
+    const gitInfo = sessionGitInfo[activeSessionId]
+    
+    set((state) => ({
+      changesPanel: { ...state.changesPanel, selectedFile: filePath, diffContent: null, diffType: null }
+    }))
+
+    if (gitInfo?.isRepo) {
+      // Git repo: get raw git diff
+      const diff = await window.accrew.git.diff(session.workspacePath, filePath)
+      set((state) => ({
+        changesPanel: { ...state.changesPanel, diffContent: diff, diffType: 'git' }
+      }))
+    } else {
+      // Non-git: find file change in messages to get diff content
+      // WHY: For tool-tracked changes, oldContent/newContent are stored with each FileChange in DB
+      const sessionMessages = messages.filter(m => m.sessionId === activeSessionId && m.role === 'assistant')
+      const workspacePath = session.workspacePath || ''
+      
+      // Find the most recent change for this file
+      let foundChange = null
+      for (let i = sessionMessages.length - 1; i >= 0; i--) {
+        const msg = sessionMessages[i]
+        if (msg.fileChanges) {
+          for (const fc of msg.fileChanges) {
+            const relativePath = fc.path.startsWith(workspacePath)
+              ? fc.path.slice(workspacePath.length).replace(/^\//, '')
+              : fc.path
+            if (relativePath === filePath) {
+              foundChange = fc
+              break
+            }
+          }
+          if (foundChange) break
+        }
+      }
+      
+      if (foundChange) {
+        // Set the diff data for the ChangesPanel to use via selectedDiff
+        set({
+          selectedDiff: {
+            sessionId: activeSessionId,
+            messageId: '',
+            filePath: filePath,
+            oldContent: foundChange.oldContent || '',
+            newContent: foundChange.newContent || '',
+            changeType: foundChange.type
+          }
+        })
+        set((state) => ({
+          changesPanel: { ...state.changesPanel, diffType: 'tool' }
+        }))
+      }
+    }
+  },
+  openChangesPanel: async () => {
+    set((state) => ({
+      changesPanel: { ...state.changesPanel, open: true }
+    }))
+    // Load files when opening panel
+    const { activeSessionId } = get()
+    if (activeSessionId) {
+      await get().loadChangedFiles(activeSessionId)
+    }
+  },
+  closeChangesPanel: () => set((state) => ({
+    changesPanel: { ...state.changesPanel, open: false, userClosed: true }
+  })),
+  resetUserClosed: () => set((state) => ({
+    changesPanel: { ...state.changesPanel, userClosed: false }
+  })),
 
   // Messages
   messages: [],
@@ -413,9 +653,15 @@ export const useStore = create<Store>((set, get) => ({
         // WHY: Database is the single source of truth for completed messages.
         // Instead of constructing the message here, just reload from DB.
         // This eliminates race conditions and duplicate message bugs.
-        const { activeSessionId } = get()
+        const { activeSessionId, sessions } = get()
         if (activeSessionId === sessionId) {
           await get().loadMessages(sessionId)
+          
+          // Refresh git info to update branch indicator (hasChanges)
+          const session = sessions.find(s => s.id === sessionId)
+          if (session?.workspacePath) {
+            await get().loadGitInfo(sessionId, session.workspacePath)
+          }
         }
       })
     )
