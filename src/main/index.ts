@@ -294,13 +294,8 @@ function createMenu() {
           click: () => {
             mainWindow?.webContents.send('view:toggle-word-wrap')
           }
-        }
-      ]
-    },
-    // Developer menu (not named "View" to prevent macOS from adding tab items)
-    {
-      label: 'Developer',
-      submenu: [
+        },
+        { type: 'separator' },
         { label: 'Toggle Developer Tools', role: 'toggleDevTools' as const, accelerator: 'Alt+CmdOrCtrl+I' }
       ]
     }
