@@ -2,6 +2,8 @@
 
 One app to manage AI coding agents across all your projects.
 
+![Accrew screenshot](docs/images/screenshot.png)
+
 Stop juggling terminal windows. Accrew gives you a unified command center where you can talk to agents, see their reasoning, watch file changes in real-time, and switch between projects without losing context.
 
 ## Why Accrew?
