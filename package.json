@@ -22,7 +22,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
-    "@github/copilot-sdk": "^0.1.21",
+    "@github/copilot-sdk": "^0.1.23",
     "@pierre/diffs": "^1.0.0",
     "@radix-ui/react-avatar": "^1.1.2",
     "@radix-ui/react-collapsible": "^1.1.2",
