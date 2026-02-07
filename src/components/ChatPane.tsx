@@ -110,7 +110,7 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
                             className={`flex items-center gap-1 hover:text-foreground transition-colors ${
                               gitInfo.hasChanges ? 'text-orange-500' : ''
                             }`}
-                            title={gitInfo.hasChanges ? 'View pending changes' : 'Toggle changes panel'}
+                            title={gitInfo.hasChanges ? 'View pending changes (⌘\\)' : 'Toggle changes panel (⌘\\)'}
                           >
                             <GitBranch className="w-3 h-3" />
                             <span className="truncate">{gitInfo.branch}</span>
@@ -124,7 +124,7 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
                             className={`flex items-center gap-1 hover:text-foreground transition-colors ${
                               changesPanel.files.length > 0 ? 'text-orange-500' : ''
                             }`}
-                            title={changesPanel.files.length > 0 ? 'View file changes' : 'Toggle changes panel'}
+                            title={changesPanel.files.length > 0 ? 'View file changes (⌘\\)' : 'Toggle changes panel (⌘\\)'}
                           >
                             <FileDiff className="w-3 h-3" />
                           </button>

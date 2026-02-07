@@ -127,13 +127,14 @@ export function ChangesPanel() {
             onClick={handleRefresh}
             disabled={refreshing}
             className="relative z-[60] p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-            title="Refresh"
+            title="Refresh (⌘⇧R)"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={closeChangesPanel}
             className="relative z-[60] p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title="Close (⌘\)"
           >
             <X className="w-4 h-4" />
           </button>

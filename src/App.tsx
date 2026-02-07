@@ -269,7 +269,7 @@ export default function App() {
       <button
         onClick={toggleSidebar}
         className="fixed top-2.5 left-[74px] z-[60] p-1.5 rounded-md hover:bg-accent/80 text-muted-foreground hover:text-foreground transition-colors no-drag"
-        title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+        title={sidebarCollapsed ? 'Show sidebar (⌘B)' : 'Hide sidebar (⌘B)'}
       >
         {sidebarCollapsed ? (
           <PanelLeft className="w-4 h-4" />

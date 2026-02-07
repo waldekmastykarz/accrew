@@ -339,7 +339,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
                 : 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
               centered ? 'p-3 mr-3' : 'p-2.5 mr-2'
             )}
-            title={aborting ? "Stopping..." : "Stop generating"}
+            title={aborting ? "Stopping..." : "Stop generating (Esc)"}
           >
             {aborting ? (
               <Loader2 className={cn("animate-spin", centered ? "w-5 h-5" : "w-4 h-4")} />
