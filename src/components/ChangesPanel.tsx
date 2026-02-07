@@ -10,15 +10,15 @@ const MAX_FILE_LIST_HEIGHT = 400
 function FileStatusIcon({ status }: { status: ChangedFile['status'] }) {
   switch (status) {
     case 'created':
-      return <FilePlus className="w-4 h-4 text-green-500" />
+      return <FilePlus className="w-3 h-3 text-green-500" />
     case 'modified':
-      return <FileEdit className="w-4 h-4 text-yellow-500" />
+      return <FileEdit className="w-3 h-3 text-yellow-500" />
     case 'deleted':
-      return <FileX className="w-4 h-4 text-red-500" />
+      return <FileX className="w-3 h-3 text-red-500" />
     case 'untracked':
-      return <FileQuestion className="w-4 h-4 text-blue-500" />
+      return <FileQuestion className="w-3 h-3 text-blue-500" />
     default:
-      return <File className="w-4 h-4 text-muted-foreground" />
+      return <File className="w-3 h-3 text-muted-foreground" />
   }
 }
 
@@ -155,15 +155,15 @@ export function ChangesPanel() {
               <button
                 key={file.path}
                 onClick={() => handleFileClick(file.path)}
-                className={`w-full flex items-center gap-2 px-4 py-2 hover:bg-muted/50 transition-colors text-left ${
+                className={`w-full flex items-center gap-1.5 px-3 py-1 hover:bg-muted/50 transition-colors text-left ${
                   selectedFile === file.path ? 'bg-muted' : ''
                 }`}
               >
                 <FileStatusIcon status={file.status} />
-                <span className="text-sm truncate flex-1 min-w-0">
+                <span className="text-xs truncate flex-1 min-w-0">
                   {file.path}
                 </span>
-                <span className="text-xs text-muted-foreground flex-shrink-0">
+                <span className="text-[10px] text-muted-foreground flex-shrink-0">
                   {statusLabel(file.status)}
                 </span>
               </button>
