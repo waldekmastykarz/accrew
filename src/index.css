@@ -164,17 +164,13 @@ code {
 
 /* Focus visible - only for buttons, not inputs */
 button:focus-visible {
-  outline: none;
-  ring: 2px;
-  ring-color: hsl(var(--ring));
-  ring-offset: 2px;
-  ring-offset-color: hsl(var(--background));
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 
 textarea:focus-visible,
 input:focus-visible {
   outline: none;
-  ring: 0;
 }
 
 /* Transitions */
