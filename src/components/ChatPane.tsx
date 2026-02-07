@@ -22,7 +22,8 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
     sessionGitInfo,
     changesPanel,
     openChangesPanel,
-    closeChangesPanel
+    closeChangesPanel,
+    pendingOperations
   } = useStore()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -76,8 +77,13 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
 
   const isEmptyState = messages.length === 0 && !currentStreaming && !activeSessionId
 
+  // WHY: Priority order for status display — streaming takes precedence over pending ops,
+  // pending ops over session status. Shows most relevant state to user.
   const getStatusDisplay = () => {
     if (currentStreaming) return { color: 'text-violet-500 fill-violet-500', label: 'Working', animate: true }
+    if (pendingOperations.has('regenerateTitle')) return { color: 'text-blue-500 fill-blue-500', label: 'Renaming...', animate: true }
+    if (pendingOperations.has('refreshWorkspaces')) return { color: 'text-blue-500 fill-blue-500', label: 'Refreshing...', animate: true }
+    if (pendingOperations.has('refreshGitInfo')) return { color: 'text-blue-500 fill-blue-500', label: 'Syncing...', animate: true }
     if (activeSession?.status === 'active') return { color: 'text-green-500 fill-green-500', label: 'Ready', animate: false }
     if (activeSession?.status === 'error') return { color: 'text-red-500 fill-red-500', label: 'Error', animate: false }
     return { color: 'text-green-500 fill-green-500', label: 'Completed', animate: false }

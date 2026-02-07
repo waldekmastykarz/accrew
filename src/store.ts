@@ -26,7 +26,16 @@ interface ChangesPanelState {
   diffType: 'git' | 'tool' | null  // Source of the diff
 }
 
+// WHY: pendingOperations tracks async operations that lack UI feedback — used by
+// ChatPane header to show "Refreshing...", "Renaming..." etc. instead of stale status
+type PendingOperation = 'refreshWorkspaces' | 'regenerateTitle' | 'refreshGitInfo'
+
 interface Store {
+  // Pending operations tracking
+  pendingOperations: Set<PendingOperation>
+  startOperation: (op: PendingOperation) => void
+  endOperation: (op: PendingOperation) => void
+
   // Theme
   theme: 'light' | 'dark'
   setTheme: (theme: 'light' | 'dark') => void
@@ -114,6 +123,19 @@ let listenersSetup = false
 let cleanupFn: (() => void) | null = null
 
 export const useStore = create<Store>((set, get) => ({
+  // Pending operations tracking
+  pendingOperations: new Set<PendingOperation>(),
+  startOperation: (op) => set((state) => {
+    const newOps = new Set(state.pendingOperations)
+    newOps.add(op)
+    return { pendingOperations: newOps }
+  }),
+  endOperation: (op) => set((state) => {
+    const newOps = new Set(state.pendingOperations)
+    newOps.delete(op)
+    return { pendingOperations: newOps }
+  }),
+
   // Theme
   theme: 'light',
   setTheme: (theme) => set({ theme }),
@@ -228,7 +250,12 @@ export const useStore = create<Store>((set, get) => ({
     }))
   },
   regenerateTitle: async (id) => {
-    return window.accrew.session.regenerateTitle(id)
+    get().startOperation('regenerateTitle')
+    try {
+      return await window.accrew.session.regenerateTitle(id)
+    } finally {
+      get().endOperation('regenerateTitle')
+    }
   },
   abortSession: async () => {
     const { activeSessionId, streamingStates } = get()
@@ -291,13 +318,18 @@ export const useStore = create<Store>((set, get) => ({
   // trigger re-renders when internal contents change, only when reference changes
   sessionGitInfo: {} as Record<string, GitInfo>,
   loadGitInfo: async (sessionId, workspacePath) => {
-    const isRepo = await window.accrew.git.isRepo(workspacePath)
-    const branch = isRepo ? await window.accrew.git.branch(workspacePath) : null
-    const status = isRepo ? await window.accrew.git.status(workspacePath) : []
-    const hasChanges = status.length > 0
-    set((state) => ({
-      sessionGitInfo: { ...state.sessionGitInfo, [sessionId]: { isRepo, branch, hasChanges } }
-    }))
+    get().startOperation('refreshGitInfo')
+    try {
+      const isRepo = await window.accrew.git.isRepo(workspacePath)
+      const branch = isRepo ? await window.accrew.git.branch(workspacePath) : null
+      const status = isRepo ? await window.accrew.git.status(workspacePath) : []
+      const hasChanges = status.length > 0
+      set((state) => ({
+        sessionGitInfo: { ...state.sessionGitInfo, [sessionId]: { isRepo, branch, hasChanges } }
+      }))
+    } finally {
+      get().endOperation('refreshGitInfo')
+    }
   },
   getGitInfoForSession: (sessionId) => {
     if (!sessionId) return null
@@ -567,8 +599,13 @@ export const useStore = create<Store>((set, get) => ({
   // Workspaces
   workspaces: [],
   loadWorkspaces: async () => {
-    const workspaces = await window.accrew.workspace.list()
-    set({ workspaces })
+    get().startOperation('refreshWorkspaces')
+    try {
+      const workspaces = await window.accrew.workspace.list()
+      set({ workspaces })
+    } finally {
+      get().endOperation('refreshWorkspaces')
+    }
   },
 
   // Config
