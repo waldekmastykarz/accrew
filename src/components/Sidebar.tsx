@@ -10,6 +10,7 @@ import {
   Archive,
   ArchiveRestore,
   Circle,
+  CircleDot,
   AlertTriangle,
   Folder,
   Filter,
@@ -30,6 +31,7 @@ export const Sidebar = forwardRef<SidebarHandle>(function Sidebar(_, ref) {
     deleteSession,
     archiveSession,
     unarchiveSession,
+    markSessionUnread,
     setSettingsOpen
   } = useStore()
 
@@ -159,6 +161,7 @@ export const Sidebar = forwardRef<SidebarHandle>(function Sidebar(_, ref) {
                   onSelect={() => setActiveSession(session.id)}
                   onDelete={() => handleDeleteClick(session.id)}
                   onArchive={() => archiveSession(session.id)}
+                  onMarkUnread={() => markSessionUnread(session.id)}
                 />
               ))}
             </div>
@@ -268,9 +271,10 @@ interface SessionItemProps {
   onDelete: () => void
   onArchive?: () => void
   onUnarchive?: () => void
+  onMarkUnread?: () => void
 }
 
-function SessionItem({ session, isActive, isStreaming, isArchived, onSelect, onDelete, onArchive, onUnarchive }: SessionItemProps) {
+function SessionItem({ session, isActive, isStreaming, isArchived, onSelect, onDelete, onArchive, onUnarchive, onMarkUnread }: SessionItemProps) {
   // Show status indicator: streaming (purple pulse) > unread (blue dot) > error (red) > nothing
   const getStatusIndicator = () => {
     if (isStreaming) {
@@ -331,16 +335,28 @@ function SessionItem({ session, isActive, isStreaming, isArchived, onSelect, onD
             <ArchiveRestore className="w-3.5 h-3.5" />
           </button>
         ) : (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onArchive?.()
-            }}
-            className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
-            title="Archive session"
-          >
-            <Archive className="w-3.5 h-3.5" />
-          </button>
+          <>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onMarkUnread?.()
+              }}
+              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
+              title="Mark as unread and move to top"
+            >
+              <CircleDot className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onArchive?.()
+              }}
+              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
+              title="Archive session"
+            >
+              <Archive className="w-3.5 h-3.5" />
+            </button>
+          </>
         )}
         <button
           onClick={(e) => {

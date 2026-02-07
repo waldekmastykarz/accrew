@@ -25,6 +25,8 @@ const api = {
       ipcRenderer.invoke('session:delete', { sessionId }) as Promise<void>,
     markRead: (sessionId: string) => 
       ipcRenderer.invoke('session:mark-read', { sessionId }) as Promise<void>,
+    markUnread: (sessionId: string) =>
+      ipcRenderer.invoke('session:mark-unread', { sessionId }) as Promise<Session>,
     setViewed: (sessionId: string | null) =>
       ipcRenderer.invoke('session:set-viewed', { sessionId }) as Promise<void>,
     archive: (sessionId: string) =>

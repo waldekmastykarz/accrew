@@ -128,6 +128,12 @@ export class Database {
     stmt.run(id)
   }
 
+  // WHY: Mark unread also updates updated_at — this moves the session to the top of the list
+  markSessionUnread(id: string): void {
+    const stmt = this.db.prepare('UPDATE sessions SET has_unread = 1, updated_at = ? WHERE id = ?')
+    stmt.run(Date.now(), id)
+  }
+
   // Message operations
   addMessage(message: Message): Message {
     const stmt = this.db.prepare(`

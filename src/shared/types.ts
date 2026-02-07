@@ -100,6 +100,7 @@ export type IpcChannels = {
   'session:get': { sessionId: string }
   'session:delete': { sessionId: string }
   'session:mark-read': { sessionId: string }
+  'session:mark-unread': { sessionId: string }
   'workspace:list': void
   'workspace:match': { prompt: string }
   'config:get': void

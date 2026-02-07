@@ -134,6 +134,11 @@ function setupIpcHandlers() {
     return database.markSessionRead(args.sessionId)
   })
 
+  ipcMain.handle('session:mark-unread', async (_, args: { sessionId: string }) => {
+    database.markSessionUnread(args.sessionId)
+    return database.getSession(args.sessionId)
+  })
+
   ipcMain.handle('session:archive', async (_, args: { sessionId: string }) => {
     database.archiveSession(args.sessionId)
     return database.getSession(args.sessionId)

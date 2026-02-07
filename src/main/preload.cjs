@@ -22,6 +22,8 @@ const api = {
       ipcRenderer.invoke('session:delete', { sessionId }),
     markRead: (sessionId) => 
       ipcRenderer.invoke('session:mark-read', { sessionId }),
+    markUnread: (sessionId) =>
+      ipcRenderer.invoke('session:mark-unread', { sessionId }),
     setViewed: (sessionId) => 
       ipcRenderer.invoke('session:set-viewed', { sessionId }),
     archive: (sessionId) => 

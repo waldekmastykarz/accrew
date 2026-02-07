@@ -60,6 +60,7 @@ interface Store {
   deleteSession: (id: string) => Promise<void>
   archiveSession: (id: string) => Promise<void>
   unarchiveSession: (id: string) => Promise<void>
+  markSessionUnread: (id: string) => Promise<void>
   regenerateTitle: (id: string) => Promise<string | null>
   abortSession: () => Promise<void>
   navigateToPreviousSession: () => void
@@ -245,6 +246,12 @@ export const useStore = create<Store>((set, get) => ({
   },
   unarchiveSession: async (id) => {
     const session = await window.accrew.session.unarchive(id)
+    set((state) => ({
+      sessions: state.sessions.map(s => s.id === id ? session : s)
+    }))
+  },
+  markSessionUnread: async (id) => {
+    const session = await window.accrew.session.markUnread(id)
     set((state) => ({
       sessions: state.sessions.map(s => s.id === id ? session : s)
     }))
