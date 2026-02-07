@@ -253,6 +253,19 @@ function createMenu() {
         { role: 'selectAll' as const }
       ]
     },
+    // Workspaces menu
+    {
+      label: 'Workspaces',
+      submenu: [
+        {
+          label: 'Refresh',
+          accelerator: 'CmdOrCtrl+R',
+          click: () => {
+            mainWindow?.webContents.send('workspace:refresh')
+          }
+        }
+      ]
+    },
     // Developer menu (not named "View" to prevent macOS from adding tab items)
     {
       label: 'Developer',

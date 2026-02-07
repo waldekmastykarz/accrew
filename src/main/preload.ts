@@ -121,6 +121,11 @@ const api = {
       ipcRenderer.on('theme:changed', listener)
       return () => ipcRenderer.removeListener('theme:changed', listener)
     },
+    workspaceRefresh: (callback: () => void) => {
+      const listener = () => callback()
+      ipcRenderer.on('workspace:refresh', listener)
+      return () => ipcRenderer.removeListener('workspace:refresh', listener)
+    },
   },
 }
 

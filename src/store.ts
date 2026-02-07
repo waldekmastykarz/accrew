@@ -710,6 +710,13 @@ export const useStore = create<Store>((set, get) => ({
       })
     )
 
+    // WHY: Cmd+R menu item triggers workspace refresh for newly created workspaces (e.g., git worktree)
+    unsubscribers.push(
+      window.accrew.on.workspaceRefresh(() => {
+        get().loadWorkspaces()
+      })
+    )
+
     listenersSetup = true
     cleanupFn = () => {
       unsubscribers.forEach(unsub => unsub())
