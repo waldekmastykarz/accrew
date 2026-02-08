@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../store'
-import { X, Folder, Type, Cpu } from 'lucide-react'
+import { X, Folder, Type, Cpu, Terminal } from 'lucide-react'
 
 interface ModelInfo {
   id: string
@@ -14,6 +14,7 @@ export function SettingsDialog() {
   const [diffFont, setDiffFont] = useState('')
   const [diffFontSize, setDiffFontSize] = useState(13)
   const [model, setModel] = useState('')
+  const [nodePath, setNodePath] = useState('')
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([])
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export function SettingsDialog() {
       setDiffFont(config.diffFont)
       setDiffFontSize(config.diffFontSize)
       setModel(config.model)
+      setNodePath(config.nodePath || '')
     }
   }, [config])
 
@@ -45,7 +47,8 @@ export function SettingsDialog() {
       workspaceDepth,
       diffFont,
       diffFontSize,
-      model
+      model,
+      nodePath
     })
     setSettingsOpen(false)
   }
@@ -183,6 +186,24 @@ export function SettingsDialog() {
                 </option>
               ))}
             </datalist>
+          </div>
+
+          {/* Node.js path */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <Terminal className="w-4 h-4 text-muted-foreground" />
+              Node.js Path
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Path to Node.js binary (used to run the Copilot CLI subprocess)
+            </p>
+            <input
+              type="text"
+              value={nodePath}
+              onChange={(e) => setNodePath(e.target.value)}
+              placeholder="/opt/homebrew/bin/node"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
           </div>
         </div>
 

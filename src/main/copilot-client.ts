@@ -15,6 +15,7 @@ export interface StreamEvent {
 export interface CopilotClientOptions {
   workingDirectory?: string
   model?: string
+  nodePath?: string
 }
 
 export class CopilotClient {
@@ -27,6 +28,15 @@ export class CopilotClient {
   }
 
   async init(): Promise<void> {
+    // WHY: SDK's bundled CLI is a .js file, so it spawns via
+    // spawn(process.execPath, [cliPath, ...args]). In Electron, process.execPath
+    // is the app binary, which opens a new window instead of running the CLI.
+    // Temporarily override to real Node.js so the SDK spawns correctly.
+    const savedExecPath = process.execPath
+    if (this.options.nodePath) {
+      process.execPath = this.options.nodePath
+    }
+
     this.client = new SDKCopilotClient({
       cwd: this.options.workingDirectory,
     })
@@ -34,6 +44,9 @@ export class CopilotClient {
     this.session = await this.client.createSession({
       model: this.options.model || 'claude-opus-4-5',
     })
+
+    // Restore original execPath after SDK has spawned the CLI process
+    process.execPath = savedExecPath
   }
 
   async *chat(message: string): AsyncGenerator<StreamEvent> {

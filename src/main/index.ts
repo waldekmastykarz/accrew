@@ -195,10 +195,17 @@ function setupIpcHandlers() {
   // Models handler
   ipcMain.handle('models:list', async () => {
     try {
+      // WHY: process.execPath override — see copilot-client.ts for full explanation
+      const nodePath = configManager.get().nodePath
+      const savedExecPath = process.execPath
+      if (nodePath) {
+        process.execPath = nodePath
+      }
       const client = new SDKCopilotClient()
       await client.start()
       const models = await client.listModels()
       await client.stop()
+      process.execPath = savedExecPath
       return models
     } catch (error) {
       console.error('Error listing models:', error)
