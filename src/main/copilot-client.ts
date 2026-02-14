@@ -1,4 +1,11 @@
 import { CopilotClient as SDKCopilotClient, CopilotSession, type SessionEvent } from '@github/copilot-sdk'
+import { app } from 'electron'
+import { existsSync } from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 export interface StreamEvent {
   type: 'thinking' | 'tool_call' | 'tool_result' | 'text'
@@ -15,7 +22,66 @@ export interface StreamEvent {
 export interface CopilotClientOptions {
   workingDirectory?: string
   model?: string
-  nodePath?: string
+}
+
+// WHY: The SDK spawns .js CLI paths via process.execPath (= Electron binary in
+// packaged apps), which opens a new window instead of running the CLI. Using the
+// native platform binary (copilot-darwin-arm64/copilot) avoids this entirely
+// because the SDK spawns it directly — no process.execPath, no Commander.js
+// electron detection, no "too many arguments" errors. The .js fallback +
+// ELECTRON_RUN_AS_NODE is kept for platforms where the native binary isn't available.
+const platformPkg = `copilot-${process.platform}-${process.arch}`
+
+function resolveCopilotCliPath(): string {
+  const nativeBin = path.join('@github', platformPkg, `copilot${process.platform === 'win32' ? '.exe' : ''}`)
+  // WHY: electron-builder nests optional deps under the parent package's
+  // node_modules, so the native binary may be at @github/copilot/node_modules/
+  // instead of the top-level @github/ in packaged builds.
+  const nestedNativeBin = path.join('@github', 'copilot', 'node_modules', nativeBin)
+  const jsFallback = path.join('@github', 'copilot', 'index.js')
+
+  // 1. ASAR-unpacked paths (packaged builds)
+  const appPath = app.getAppPath()
+  const unpackedBase = appPath + '.unpacked'
+  for (const bin of [nativeBin, nestedNativeBin]) {
+    const candidate = path.join(unpackedBase, 'node_modules', bin)
+    if (existsSync(candidate)) return candidate
+  }
+  const unpackedJs = path.join(unpackedBase, 'node_modules', jsFallback)
+  if (existsSync(unpackedJs)) return unpackedJs
+
+  // 2. Walk up from __dirname (dev mode)
+  let dir = __dirname
+  for (let i = 0; i < 10; i++) {
+    for (const bin of [nativeBin, nestedNativeBin]) {
+      const candidate = path.join(dir, 'node_modules', bin)
+      if (existsSync(candidate)) return candidate
+    }
+    const candidateJs = path.join(dir, 'node_modules', jsFallback)
+    if (existsSync(candidateJs)) return candidateJs
+    const parent = path.dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+
+  return ''
+}
+
+// WHY: When the resolved CLI path is a .js file (native binary not found),
+// the SDK spawns it via process.execPath which is the Electron binary.
+// ELECTRON_RUN_AS_NODE=1 makes that spawned process act as Node.js instead
+// of opening a new Electron window. Not needed for native binaries since
+// they're spawned directly without process.execPath.
+export function getCopilotCliOptions(): { cliPath?: string; env?: NodeJS.ProcessEnv } {
+  const cliPath = resolveCopilotCliPath()
+  if (!cliPath) return {}
+
+  const opts: { cliPath: string; env?: NodeJS.ProcessEnv } = { cliPath }
+  if (cliPath.endsWith('.js')) {
+    opts.env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+  }
+  console.log(`[CopilotClient] Resolved CLI: ${cliPath} (native=${!cliPath.endsWith('.js')})`)
+  return opts
 }
 
 export class CopilotClient {
@@ -28,25 +94,15 @@ export class CopilotClient {
   }
 
   async init(): Promise<void> {
-    // WHY: SDK's bundled CLI is a .js file, so it spawns via
-    // spawn(process.execPath, [cliPath, ...args]). In Electron, process.execPath
-    // is the app binary, which opens a new window instead of running the CLI.
-    // Temporarily override to real Node.js so the SDK spawns correctly.
-    const savedExecPath = process.execPath
-    if (this.options.nodePath) {
-      process.execPath = this.options.nodePath
-    }
-
+    const cliOpts = getCopilotCliOptions()
     this.client = new SDKCopilotClient({
       cwd: this.options.workingDirectory,
+      ...cliOpts,
     })
     
     this.session = await this.client.createSession({
       model: this.options.model || 'claude-opus-4-5',
     })
-
-    // Restore original execPath after SDK has spawned the CLI process
-    process.execPath = savedExecPath
   }
 
   async *chat(message: string): AsyncGenerator<StreamEvent> {

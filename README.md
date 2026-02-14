@@ -18,7 +18,6 @@ Stop juggling terminal windows. Accrew gives you a unified command center where 
 
 - **GitHub Copilot subscription** — active Copilot Individual or Business plan
 - **[Copilot CLI](https://docs.github.com/en/copilot/managing-copilot/configure-personal-settings/installing-the-github-copilot-extension-in-your-environment)** — installed and signed in (`copilot auth login`)
-- **[Node.js](https://nodejs.org/)** — required to run the Copilot CLI subprocess. Accrew is an Electron app and needs a standalone Node.js binary on the system (Electron's bundled runtime can't be used for subprocesses). Default path: `/opt/homebrew/bin/node` (macOS/Homebrew). Configure in Settings if Node.js is installed elsewhere.
 
 ## Quick Start
 
@@ -26,7 +25,7 @@ Stop juggling terminal windows. Accrew gives you a unified command center where 
 2. Open `Accrew.app`
 3. Start chatting — auth is automatic via GitHub Copilot CLI
 
-> **Tip:** If messages stay stuck at "Thinking...", check that the Node.js path in Settings points to a valid `node` binary.
+> **Tip:** If messages stay stuck at "Thinking...", check that Copilot CLI is installed and authenticated (`copilot auth status`).
 
 ## Configuration
 
@@ -36,7 +35,6 @@ Settings stored in `~/.accrew/config.json`:
 {
   "workspaceFolder": "~/github",
   "model": "claude-opus-4-5",
-  "nodePath": "/opt/homebrew/bin/node",
   "diffFont": "ui-monospace",
   "diffFontSize": 13,
   "sidebarWidth": 256
@@ -44,10 +42,9 @@ Settings stored in `~/.accrew/config.json`:
 ```
 
 | Key | Description | Default |
-|-----|-------------|---------|
+|-----|-------------|--------|
 | `workspaceFolder` | Root folder containing your projects | `~/github` |
 | `model` | LLM model for agent responses | `claude-opus-4-5` |
-| `nodePath` | Path to Node.js binary (used to spawn Copilot CLI) | `/opt/homebrew/bin/node` |
 | `diffFont` | Font for diff viewer | `ui-monospace` |
 | `diffFontSize` | Font size for diff viewer | `13` |
 

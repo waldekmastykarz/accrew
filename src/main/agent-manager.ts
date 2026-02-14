@@ -174,7 +174,6 @@ export class AgentManager {
         active.copilotClient = new CopilotClient({
           workingDirectory: active.session.workspacePath || process.cwd(),
           model: config.model,
-          nodePath: config.nodePath || undefined,
         })
         await active.copilotClient.init()
       }
@@ -341,7 +340,6 @@ export class AgentManager {
       const config = this.configManager.get()
       const matchClient = new CopilotClient({
         model: config.model,
-        nodePath: config.nodePath || undefined,
       })
       await matchClient.init()
 
@@ -414,7 +412,6 @@ Only match if confidence > 0.7. Be conservative.`
       const titleClient = new CopilotClient({
         workingDirectory: active?.session.workspacePath || undefined,
         model: config.model,
-        nodePath: config.nodePath || undefined,
       })
       await titleClient.init()
 
@@ -452,7 +449,6 @@ Respond with just the title, no quotes or punctuation.`
       const titleClient = new CopilotClient({
         workingDirectory: session?.workspacePath || undefined,
         model: config.model,
-        nodePath: config.nodePath || undefined,
       })
       await titleClient.init()
 

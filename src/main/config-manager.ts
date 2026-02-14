@@ -13,7 +13,6 @@ const DEFAULT_CONFIG: Config = {
   changesPanelWidth: 500,
   changesFileListHeight: 200,
   model: 'claude-opus-4-5',
-  nodePath: '/opt/homebrew/bin/node'
 }
 
 export class ConfigManager {

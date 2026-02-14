@@ -118,7 +118,7 @@ Shared types live in `src/shared/types.ts` — single source of truth for `Sessi
 | File | Purpose |
 |------|---------|
 | `src/main/agent-manager.ts` | Session lifecycle, workspace routing, streaming coordination |
-| `src/main/copilot-client.ts` | Wraps `@github/copilot-sdk`, normalizes SDK events to `StreamEvent`. Overrides `process.execPath` to real Node.js before SDK init (see WHY comment) |
+| `src/main/copilot-client.ts` | Wraps `@github/copilot-sdk`, normalizes SDK events to `StreamEvent`. Exports `getCopilotCliOptions()` which resolves the native platform binary (`copilot-darwin-arm64/copilot`) for spawning the CLI — see WHY comments |
 | `src/main/database.ts` | SQLite via better-sqlite3, WAL mode, stores sessions/messages/file snapshots |
 | `src/store.ts` | Zustand store, IPC event subscriptions, streaming state |
 | `src/components/DiffPane.tsx` | Uses `@pierre/diffs/react` for diff rendering |
@@ -126,7 +126,7 @@ Shared types live in `src/shared/types.ts` — single source of truth for `Sessi
 ## Conventions
 
 - **Models**: Default agent model is `claude-opus-4-5`, configurable via `~/.accrew/config.json`
-- **Config**: Stored at `~/.accrew/config.json` (workspaceFolder, model, nodePath, diffFont, diffFontSize, sidebarWidth)
+- **Config**: Stored at `~/.accrew/config.json` (workspaceFolder, model, diffFont, diffFontSize, sidebarWidth)
 - **Database**: Located at Electron's `userData` path (`~/Library/Application Support/accrew/accrew.db` on macOS)
 - **Workspace routing**: `@workspace` explicit mention OR LLM-based prompt inference (see `matchWorkspace()` in agent-manager)
 
@@ -157,4 +157,4 @@ This codebase uses `WHY:` comments to document non-obvious decisions. Before edi
 - SQLite database at `~/Library/Application Support/accrew/accrew.db` (macOS)
 - If native module errors: `npm run postinstall` then restart
 - Stream events debug: add `console.log` in `CopilotClient.normalizeEvent()`
-- If agent opens a new Electron window instead of responding: the `nodePath` config is wrong or missing. Must point to a real `node` binary, not the Electron executable. Check `~/.accrew/config.json` or Settings > Node.js Path.
+- If agent opens a new Electron window instead of responding: the native binary (`@github/copilot-darwin-arm64/copilot`) isn't being resolved. Check `resolveCopilotCliPath()` in `copilot-client.ts` — it checks both top-level and nested `node_modules` paths, plus `app.asar.unpacked` for packaged builds.
