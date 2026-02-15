@@ -76,12 +76,6 @@ jobs:
           APPLE_KEYCHAIN_PROFILE: accrew-notary
         run: npm run package
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: Accrew-macOS
-          path: release/*.dmg
-
   build-windows:
     runs-on: windows-latest
     
@@ -105,9 +99,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run package:win
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: Accrew-Windows
-          path: release/*.exe
