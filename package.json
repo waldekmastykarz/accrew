@@ -93,7 +93,10 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "notarize": true
+      "notarize": true,
+      "signIgnore": [
+        "copilot-(darwin|linux|win32)-(arm64|x64)"
+      ]
     },
     "win": {
       "target": "nsis",

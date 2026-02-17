@@ -100,9 +100,24 @@ export class CopilotClient {
       ...cliOpts,
     })
     
-    this.session = await this.client.createSession({
-      model: this.options.model || 'claude-opus-4-5',
+    // WHY: SDK's createSession → start() → verifyProtocolVersion() has no timeout.
+    // If the CLI binary can't respond (e.g., blocked by macOS Keychain prompt when
+    // signed with a different identity), the await hangs forever with no error.
+    // 30s timeout ensures the error surfaces to the user instead of infinite spin.
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(
+        'Copilot CLI failed to start within 30 seconds. ' +
+        'This may happen if GitHub Copilot authentication is missing or blocked. ' +
+        'Try running "copilot auth login" in your terminal.'
+      )), 30_000)
     })
+    
+    this.session = await Promise.race([
+      this.client.createSession({
+        model: this.options.model || 'claude-opus-4-5',
+      }),
+      timeout
+    ])
   }
 
   async *chat(message: string): AsyncGenerator<StreamEvent> {
