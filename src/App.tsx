@@ -277,9 +277,12 @@ export default function App() {
       <div className="fixed top-0 left-0 right-0 h-8 drag-region z-50" />
       
       {/* Sidebar toggle - fixed position next to traffic lights */}
+      {/* WHY: trafficLightPosition { x:16, y:16 } = top-left of button area. Each light is
+         12px wide, 20px center-to-center → green right edge at 68px. left-[80px] gives 12px
+         gap from green light. top-[9px] vertically centers the button with traffic lights */}
       <button
         onClick={toggleSidebar}
-        className="fixed top-2.5 left-[74px] z-[60] p-1.5 rounded-md hover:bg-accent/80 text-muted-foreground hover:text-foreground transition-colors no-drag"
+        className="fixed top-[9px] left-[80px] z-[60] p-1.5 rounded-md hover:bg-accent/80 text-muted-foreground hover:text-foreground transition-colors no-drag"
         title={sidebarCollapsed ? 'Show sidebar (⌘B)' : 'Hide sidebar (⌘B)'}
       >
         {sidebarCollapsed ? (
