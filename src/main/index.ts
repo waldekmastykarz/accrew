@@ -10,6 +10,7 @@ import { ConfigManager } from './config-manager.js'
 import { GitManager } from './git-manager.js'
 import { CopilotClient as SDKCopilotClient } from '@github/copilot-sdk'
 import { getCopilotCliOptions } from './copilot-client.js'
+import { initLogger, debug } from './logger.js'
 import type { Config } from './types.js'
 
 // ESM __dirname polyfill
@@ -80,6 +81,9 @@ function createWindow() {
 async function initializeServices() {
   configManager = new ConfigManager()
   await configManager.init()
+
+  initLogger(() => configManager.get().debug)
+  debug('app', 'Services initializing', { isDev, version: app.getVersion(), platform: process.platform, arch: process.arch })
   
   database = new Database()
   await database.init()
@@ -99,6 +103,8 @@ async function initializeServices() {
   agentManager = new AgentManager(database, workspaceManager, configManager, (event, data) => {
     mainWindow?.webContents.send(event, data)
   })
+
+  debug('app', 'Services initialized')
 }
 
 function setupIpcHandlers() {
@@ -173,6 +179,7 @@ function setupIpcHandlers() {
   })
 
   ipcMain.handle('config:set', async (_, config: Partial<Config>) => {
+    debug('ipc', 'config:set', config)
     configManager.set(config)
     if (config.workspaceFolder) {
       workspaceManager.setWorkspaceFolder(config.workspaceFolder)
@@ -196,6 +203,7 @@ function setupIpcHandlers() {
   // Models handler
   ipcMain.handle('models:list', async () => {
     try {
+      debug('ipc', 'models:list — fetching available models')
       const cliOpts = getCopilotCliOptions()
       const client = new SDKCopilotClient(cliOpts)
       await client.start()
@@ -206,6 +214,11 @@ function setupIpcHandlers() {
       console.error('Error listing models:', error)
       return []
     }
+  })
+
+  // Debug logging handler (renderer → main process log file)
+  ipcMain.handle('debug:log', async (_, args: { category: string; message: string; data?: unknown }) => {
+    debug(args.category, args.message, args.data)
   })
 
   // Git handlers

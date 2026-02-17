@@ -71,6 +71,12 @@ const api = {
       ipcRenderer.invoke('theme:get') as Promise<'light' | 'dark'>,
   },
 
+  // Debug logging
+  debug: {
+    log: (category: string, message: string, data?: unknown) =>
+      ipcRenderer.invoke('debug:log', { category, message, data }) as Promise<void>,
+  },
+
   // Event listeners
   on: {
     agentThinking: (callback: (data: { sessionId: string; content: string }) => void) => {

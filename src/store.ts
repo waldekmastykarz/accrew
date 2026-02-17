@@ -126,6 +126,10 @@ interface Store {
 let listenersSetup = false
 let cleanupFn: (() => void) | null = null
 
+function rendererDebug(category: string, message: string, data?: unknown): void {
+  window.accrew?.debug?.log(category, message, data)
+}
+
 export const useStore = create<Store>((set, get) => ({
   // Pending operations tracking
   pendingOperations: new Set<PendingOperation>(),
@@ -732,6 +736,8 @@ export const useStore = create<Store>((set, get) => ({
         // Skip if we're aborting - the abort handler will clean up
         if (get().aborting) return
         
+        rendererDebug('store', 'agent:done', { sessionId })
+        
         // Remove from streaming sessions and streaming states
         const newStreamingSessions = new Set(get().streamingSessions)
         newStreamingSessions.delete(sessionId)
@@ -758,6 +764,7 @@ export const useStore = create<Store>((set, get) => ({
     unsubscribers.push(
       window.accrew.on.agentError(({ sessionId, error }) => {
         console.error(`Agent error in session ${sessionId}:`, error)
+        rendererDebug('store', 'agent:error', { sessionId, error })
         const newStreamingSessions = new Set(get().streamingSessions)
         newStreamingSessions.delete(sessionId)
         const newStreamingStates = new Map(get().streamingStates)

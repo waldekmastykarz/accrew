@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../store'
-import { X, Folder, Type, Cpu } from 'lucide-react'
+import { X, Folder, Type, Cpu, Bug } from 'lucide-react'
 
 interface ModelInfo {
   id: string
@@ -14,6 +14,7 @@ export function SettingsDialog() {
   const [diffFont, setDiffFont] = useState('')
   const [diffFontSize, setDiffFontSize] = useState(13)
   const [model, setModel] = useState('')
+  const [debugEnabled, setDebugEnabled] = useState(false)
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([])
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export function SettingsDialog() {
       setDiffFont(config.diffFont)
       setDiffFontSize(config.diffFontSize)
       setModel(config.model)
+      setDebugEnabled(config.debug)
     }
   }, [config])
 
@@ -46,6 +48,7 @@ export function SettingsDialog() {
       diffFont,
       diffFontSize,
       model,
+      debug: debugEnabled,
     })
     setSettingsOpen(false)
   }
@@ -183,6 +186,26 @@ export function SettingsDialog() {
                 </option>
               ))}
             </datalist>
+          </div>
+
+          {/* Debug mode */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <Bug className="w-4 h-4 text-muted-foreground" />
+              Debug Mode
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Log diagnostic info to terminal and ~/.accrew/debug.log
+            </p>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={debugEnabled}
+                onChange={(e) => setDebugEnabled(e.target.checked)}
+                className="rounded border-border"
+              />
+              <span className="text-sm">Enable debug logging</span>
+            </label>
           </div>
         </div>
 

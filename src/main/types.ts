@@ -57,6 +57,7 @@ export interface Config {
   changesPanelWidth: number
   changesFileListHeight: number
   model: string
+  debug: boolean
 }
 
 export interface WorkspaceMatch {

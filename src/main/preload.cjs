@@ -80,6 +80,12 @@ const api = {
       ipcRenderer.invoke('theme:get'),
   },
 
+  // Debug logging
+  debug: {
+    log: (category, message, data) =>
+      ipcRenderer.invoke('debug:log', { category, message, data }),
+  },
+
   // Event listeners
   on: {
     agentThinking: (callback) => {

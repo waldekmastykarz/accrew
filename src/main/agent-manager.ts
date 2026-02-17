@@ -4,6 +4,7 @@ import { Database } from './database.js'
 import { WorkspaceManager } from './workspace-manager.js'
 import { ConfigManager } from './config-manager.js'
 import { CopilotClient, type StreamEvent } from './copilot-client.js'
+import { debug } from './logger.js'
 import type { Session, Message, FileChange, ToolCall, WorkspaceMatch, Workspace } from './types.js'
 
 type EventEmitter = (event: string, data: unknown) => void
@@ -39,6 +40,7 @@ export class AgentManager {
   }
 
   async createSession(workspaceName: string | undefined, prompt: string, sessionId: string): Promise<Session> {
+    debug('agent', 'Creating session', { sessionId, workspaceName, promptLength: prompt.length })
     let workspace: Workspace | null = null
     let workspacePath: string | null = null
 
@@ -85,6 +87,7 @@ export class AgentManager {
     }
 
     this.database.createSession(session)
+    debug('agent', 'Session created', { sessionId: session.id, workspace: session.workspace, workspacePath: session.workspacePath })
 
     // Initialize active session tracking
     this.activeSessions.set(session.id, {
@@ -171,6 +174,7 @@ export class AgentManager {
     try {
       if (!active.copilotClient) {
         const config = this.configManager.get()
+        debug('agent', 'Initializing CopilotClient', { sessionId, model: config.model, workingDir: active.session.workspacePath })
         active.copilotClient = new CopilotClient({
           workingDirectory: active.session.workspacePath || process.cwd(),
           model: config.model,
@@ -214,6 +218,7 @@ export class AgentManager {
         fileChanges: active.fileChanges,
         aborted: active.aborted
       })
+      debug('agent', 'Message complete', { sessionId, contentLength: active.content.length, toolCalls: active.toolCalls.length, fileChanges: active.fileChanges.length, aborted: active.aborted })
 
       // Bounce dock icon on macOS to notify user
       if (process.platform === 'darwin') {
@@ -235,6 +240,7 @@ export class AgentManager {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      debug('agent', 'Error in sendMessage', { sessionId, error: errorMessage })
       this.emit('agent:error', { sessionId, error: errorMessage })
       this.database.updateSession(sessionId, { status: 'error' })
     }
@@ -252,6 +258,7 @@ export class AgentManager {
 
       case 'tool_call':
         if (event.id && event.name) {
+          debug('agent', 'Tool call', { sessionId, tool: event.name, id: event.id })
           const toolCall: ToolCall = {
             id: event.id,
             name: event.name,
@@ -302,6 +309,7 @@ export class AgentManager {
             this.emit('agent:file-change', { sessionId, change })
           }
         }
+        debug('agent', 'Tool result', { sessionId, toolCallId: event.toolCallId, tool: tc?.name })
         this.emit('agent:tool-result', { sessionId, toolCallId: event.toolCallId, result: event.result })
         break
 
@@ -322,6 +330,7 @@ export class AgentManager {
   }
 
   async matchWorkspace(prompt: string): Promise<WorkspaceMatch> {
+    debug('agent', 'Matching workspace', { promptLength: prompt.length })
     const workspaces = await this.workspaceManager.listWorkspaces()
     
     if (workspaces.length === 0) {
@@ -364,11 +373,13 @@ Only match if confidence > 0.7. Be conservative.`
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0])
         const matchedWorkspace = workspaces.find(w => w.name === parsed.workspace)
-        return {
+        const result = {
           workspace: matchedWorkspace || null,
           confidence: parsed.confidence || 0,
           reason: parsed.reason || ''
         }
+        debug('agent', 'Workspace match result', { workspace: result.workspace?.name || null, confidence: result.confidence, reason: result.reason })
+        return result
       }
     } catch {
       // Fall back to simple matching
@@ -407,6 +418,7 @@ Only match if confidence > 0.7. Be conservative.`
     
     if (messages.length < 2) return
 
+    debug('agent', 'Generating title', { sessionId })
     try {
       const config = this.configManager.get()
       const titleClient = new CopilotClient({

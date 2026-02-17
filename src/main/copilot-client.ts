@@ -3,6 +3,7 @@ import { app } from 'electron'
 import { existsSync } from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { debug } from './logger.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -80,7 +81,7 @@ export function getCopilotCliOptions(): { cliPath?: string; env?: NodeJS.Process
   if (cliPath.endsWith('.js')) {
     opts.env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
   }
-  console.log(`[CopilotClient] Resolved CLI: ${cliPath} (native=${!cliPath.endsWith('.js')})`)
+  debug('copilot', `Resolved CLI: ${cliPath} (native=${!cliPath.endsWith('.js')})`)
   return opts
 }
 
@@ -94,6 +95,7 @@ export class CopilotClient {
   }
 
   async init(): Promise<void> {
+    debug('copilot', 'Initializing client', { workingDirectory: this.options.workingDirectory, model: this.options.model })
     const cliOpts = getCopilotCliOptions()
     this.client = new SDKCopilotClient({
       cwd: this.options.workingDirectory,
@@ -118,12 +120,14 @@ export class CopilotClient {
       }),
       timeout
     ])
+    debug('copilot', 'Session created successfully')
   }
 
   async *chat(message: string): AsyncGenerator<StreamEvent> {
     if (!this.session) {
       throw new Error('CopilotClient not initialized')
     }
+    debug('copilot', 'Sending chat message', { length: message.length })
 
     const events: StreamEvent[] = []
     let resolve: (() => void) | null = null
@@ -164,6 +168,7 @@ export class CopilotClient {
   }
 
   async stop(): Promise<void> {
+    debug('copilot', 'Stopping client')
     if (this.session) {
       await this.session.destroy()
       this.session = null
@@ -175,6 +180,7 @@ export class CopilotClient {
   }
 
   async abort(): Promise<void> {
+    debug('copilot', 'Aborting session')
     if (this.session) {
       await this.session.abort()
     }
