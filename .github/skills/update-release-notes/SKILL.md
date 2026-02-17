@@ -1,4 +1,3 @@
-````skill
 ---
 name: update-release-notes
 description: This skill should be used when the user asks to "update release notes", "fix release notes", "clean up release notes", "add release notes", "write release notes", or mentions anything related to updating GitHub release descriptions.
@@ -144,4 +143,3 @@ Before pushing any release note update:
 - [ ] Rewrote commit messages into clean descriptions
 - [ ] Omitted empty sections
 - [ ] Pushed updated notes via `gh release edit`
-````
