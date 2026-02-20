@@ -108,11 +108,34 @@ export class GitManager {
         maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large diffs
       })
 
-      if (!diff.trim()) {
-        return null
+      if (diff.trim()) {
+        return diff
       }
 
-      return diff
+      // WHY: git diff HEAD returns empty for staged-only new files (status A with no
+      // working tree changes). Fall back to --cached which compares index to HEAD.
+      return this.getCachedDiff(repoPath, filePath)
+    } catch {
+      // WHY: git diff HEAD fails when HEAD doesn't exist (first commit in repo).
+      // Try --cached (compares index to empty tree), then fall back to reading
+      // the file directly for untracked files.
+      return this.getCachedDiff(repoPath, filePath)
+        ?? this.generateUntrackedDiff(repoPath, filePath)
+    }
+  }
+
+  /**
+   * Get cached (staged) diff for a specific file
+   */
+  private getCachedDiff(repoPath: string, filePath: string): string | null {
+    try {
+      const diff = execSync(`git diff --cached -- "${filePath}"`, {
+        cwd: repoPath,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        encoding: 'utf-8',
+        maxBuffer: 10 * 1024 * 1024
+      })
+      return diff.trim() ? diff : null
     } catch {
       return null
     }
