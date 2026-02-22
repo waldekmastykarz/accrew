@@ -208,6 +208,13 @@ export function ChangesPanel() {
               overflow: config?.diffWordWrap ? 'wrap' : 'scroll',
             }}
           />
+        ) : diffType !== null ? (
+          // WHY: diffType is set but content is empty — getDiff() resolved with null
+          // (e.g. staged-only changes, submodules, binary files). Show "no changes"
+          // instead of the infinite "Loading diff..." that previously appeared here.
+          <div className="p-4 text-center text-muted-foreground text-sm">
+            No changes to display
+          </div>
         ) : (
           <div className="p-4 text-center text-muted-foreground text-sm">
             Loading diff...
