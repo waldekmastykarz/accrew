@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import { MessageBubble } from './MessageBubble'
 import { StreamingMessage } from './StreamingMessage'
 import { PromptInput, PromptInputHandle } from './PromptInput'
+import { ConversationNav } from './ConversationNav'
 import { Circle, GitBranch, FileDiff } from 'lucide-react'
 
 export interface ChatPaneHandle {
@@ -30,6 +31,7 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const promptInputRef = useRef<PromptInputHandle>(null)
   const wasStreamingRef = useRef<boolean>(false)
+  const hasScrolledToStreamingRef = useRef<boolean>(false)
   const activeSession = sessions.find(s => s.id === activeSessionId)
   const gitInfo = activeSessionId ? sessionGitInfo[activeSessionId] : null
 
@@ -44,17 +46,32 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
   // Use streamingSessions (Set) for boolean check - more reliable reactivity than Map.has()
   const isStreamingThisSession = activeSessionId ? streamingSessions.has(activeSessionId) : false
 
-  // Auto-scroll to bottom (instant for streaming, smooth otherwise)
+  // WHY: Scroll to start of response when streaming begins — user wants to see the beginning
+  // of the response, not the bottom. Only scrolls once per streaming session to avoid
+  // disrupting manual scrolling while the user reads the response.
   useEffect(() => {
-    if (currentStreaming) {
-      // Instant scroll during streaming to avoid lag
-      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+    if (currentStreaming && !hasScrolledToStreamingRef.current) {
+      const el = scrollContainerRef.current?.querySelector('[data-message-id="streaming"]')
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        hasScrolledToStreamingRef.current = true
+      }
     }
-  }, [currentStreaming?.content, currentStreaming?.thinking, currentStreaming?.toolCalls.length])
+    if (!currentStreaming) {
+      hasScrolledToStreamingRef.current = false
+    }
+  }, [currentStreaming])
 
+  // WHY: Scroll to the start of the last message when new messages arrive — keeps the
+  // beginning of the response visible instead of scrolling past it to the bottom.
   useEffect(() => {
-    // Smooth scroll when new messages arrive
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messages.length > 0) {
+      const lastMsg = messages[messages.length - 1]
+      const el = scrollContainerRef.current?.querySelector(`[data-message-id="${lastMsg.id}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
   }, [messages.length])
 
   // Focus input when streaming ends
@@ -144,39 +161,56 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
       )}
 
       {/* Messages or Empty State */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 flex flex-col w-full">
-        {isEmptyState ? (
-          <div className="flex-1 flex flex-col items-center justify-center px-8 w-full relative">
-            <div className="w-full max-w-3xl">
-              {/* WHY: key forces remount on session switch — without it, local value state
-                  bleeds across sessions because React reuses the component instance */}
-              <PromptInput key="new" ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} centered />
+      {(() => {
+        /* WHY: Filter out last assistant message when streaming — StreamingMessage handles
+            the in-progress response. Without this, navigating away and back during streaming
+            shows the message twice (once from DB, once from streaming state) */
+        const filteredMessages = currentStreaming
+          ? messages.filter((m, i, arr) => !(m.role === 'assistant' && i === arr.length - 1))
+          : messages
+
+        return (
+          <div className="flex-1 min-h-0 relative">
+            <div ref={scrollContainerRef} className="h-full overflow-y-auto overflow-x-hidden flex flex-col w-full">
+              {isEmptyState ? (
+                <div className="flex-1 flex flex-col items-center justify-center px-8 w-full relative">
+                  <div className="w-full max-w-3xl">
+                    {/* WHY: key forces remount on session switch — without it, local value state
+                        bleeds across sessions because React reuses the component instance */}
+                    <PromptInput key="new" ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} centered />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex-1 py-6 px-8">
+                    {filteredMessages.map((message) => (
+                      <MessageBubble key={message.id} message={message} />
+                    ))}
+                    {currentStreaming && <StreamingMessage streaming={currentStreaming} />}
+                    <div ref={messagesEndRef} className="h-1" />
+                  </div>
+                  {/* Input at bottom when there's content */}
+                  <div className="border-t border-border/50 p-6 flex-shrink-0">
+                    {/* WHY: key forces remount on session switch — without it, local value state
+                        bleeds across sessions because React reuses the component instance */}
+                    <PromptInput key={activeSessionId} ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} />
+                  </div>
+                </>
+              )}
             </div>
+            {/* WHY: ConversationNav is outside the scroll container — it overlays the right edge
+                and stays visible while messages scroll underneath, acting like a scrollbar
+                enhancement for quick navigation between conversation turns */}
+            {!isEmptyState && (
+              <ConversationNav
+                messages={filteredMessages}
+                isStreaming={isStreamingThisSession}
+                scrollContainerRef={scrollContainerRef}
+              />
+            )}
           </div>
-        ) : (
-          <>
-            <div className="flex-1 py-6 px-8">
-              {/* WHY: Filter out last assistant message when streaming — StreamingMessage handles
-                  the in-progress response. Without this, navigating away and back during streaming
-                  shows the message twice (once from DB, once from streaming state) */}
-              {(currentStreaming 
-                ? messages.filter((m, i, arr) => !(m.role === 'assistant' && i === arr.length - 1))
-                : messages
-              ).map((message) => (
-                <MessageBubble key={message.id} message={message} />
-              ))}
-              {currentStreaming && <StreamingMessage streaming={currentStreaming} />}
-              <div ref={messagesEndRef} className="h-1" />
-            </div>
-            {/* Input at bottom when there's content */}
-            <div className="border-t border-border/50 p-6 flex-shrink-0">
-              {/* WHY: key forces remount on session switch — without it, local value state
-                  bleeds across sessions because React reuses the component instance */}
-              <PromptInput key={activeSessionId} ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} />
-            </div>
-          </>
-        )}
-      </div>
+        )
+      })()}
     </div>
   )
 })
