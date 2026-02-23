@@ -141,7 +141,10 @@
 
 /* Code blocks */
 pre {
-  @apply bg-muted rounded-md p-4 overflow-x-auto;
+  /* WHY: text-foreground overrides the light text color from @tailwindcss/typography's
+     prose preset, which assumes a dark code-block background. Without it, light text
+     on bg-muted is illegible. */
+  @apply bg-muted text-foreground rounded-md p-4 overflow-x-auto;
 }
 
 code {
