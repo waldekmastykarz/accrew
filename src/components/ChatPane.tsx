@@ -1,4 +1,4 @@
-import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
+import { useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { useStore } from '../store'
 import { MessageBubble } from './MessageBubble'
 import { StreamingMessage } from './StreamingMessage'
@@ -94,6 +94,15 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
 
   const isEmptyState = messages.length === 0 && !currentStreaming && !activeSessionId
 
+  /* WHY: Filter out last assistant message when streaming — StreamingMessage handles
+      the in-progress response. Without this, navigating away and back during streaming
+      shows the message twice (once from DB, once from streaming state) */
+  const filteredMessages = useMemo(() =>
+    currentStreaming
+      ? messages.filter((m, i, arr) => !(m.role === 'assistant' && i === arr.length - 1))
+      : messages
+  , [messages, currentStreaming])
+
   // WHY: Priority order for status display — streaming takes precedence over pending ops,
   // pending ops over session status. Shows most relevant state to user.
   const getStatusDisplay = () => {
@@ -161,56 +170,45 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
       )}
 
       {/* Messages or Empty State */}
-      {(() => {
-        /* WHY: Filter out last assistant message when streaming — StreamingMessage handles
-            the in-progress response. Without this, navigating away and back during streaming
-            shows the message twice (once from DB, once from streaming state) */
-        const filteredMessages = currentStreaming
-          ? messages.filter((m, i, arr) => !(m.role === 'assistant' && i === arr.length - 1))
-          : messages
-
-        return (
-          <div className="flex-1 min-h-0 relative">
-            <div ref={scrollContainerRef} className="h-full overflow-y-auto overflow-x-hidden flex flex-col w-full">
-              {isEmptyState ? (
-                <div className="flex-1 flex flex-col items-center justify-center px-8 w-full relative">
-                  <div className="w-full max-w-3xl">
-                    {/* WHY: key forces remount on session switch — without it, local value state
-                        bleeds across sessions because React reuses the component instance */}
-                    <PromptInput key="new" ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} centered />
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="flex-1 py-6 px-8">
-                    {filteredMessages.map((message) => (
-                      <MessageBubble key={message.id} message={message} />
-                    ))}
-                    {currentStreaming && <StreamingMessage streaming={currentStreaming} />}
-                    <div ref={messagesEndRef} className="h-1" />
-                  </div>
-                  {/* Input at bottom when there's content */}
-                  <div className="border-t border-border/50 p-6 flex-shrink-0">
-                    {/* WHY: key forces remount on session switch — without it, local value state
-                        bleeds across sessions because React reuses the component instance */}
-                    <PromptInput key={activeSessionId} ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} />
-                  </div>
-                </>
-              )}
+      <div className="flex-1 min-h-0 relative">
+        <div ref={scrollContainerRef} className="h-full overflow-y-auto overflow-x-hidden flex flex-col w-full">
+          {isEmptyState ? (
+            <div className="flex-1 flex flex-col items-center justify-center px-8 w-full relative">
+              <div className="w-full max-w-3xl">
+                {/* WHY: key forces remount on session switch — without it, local value state
+                    bleeds across sessions because React reuses the component instance */}
+                <PromptInput key="new" ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} centered />
+              </div>
             </div>
-            {/* WHY: ConversationNav is outside the scroll container — it overlays the right edge
-                and stays visible while messages scroll underneath, acting like a scrollbar
-                enhancement for quick navigation between conversation turns */}
-            {!isEmptyState && (
-              <ConversationNav
-                messages={filteredMessages}
-                isStreaming={isStreamingThisSession}
-                scrollContainerRef={scrollContainerRef}
-              />
-            )}
-          </div>
-        )
-      })()}
+          ) : (
+            <>
+              <div className="flex-1 py-6 px-8">
+                {filteredMessages.map((message) => (
+                  <MessageBubble key={message.id} message={message} />
+                ))}
+                {currentStreaming && <StreamingMessage streaming={currentStreaming} />}
+                <div ref={messagesEndRef} className="h-1" />
+              </div>
+              {/* Input at bottom when there's content */}
+              <div className="border-t border-border/50 p-6 flex-shrink-0">
+                {/* WHY: key forces remount on session switch — without it, local value state
+                    bleeds across sessions because React reuses the component instance */}
+                <PromptInput key={activeSessionId} ref={promptInputRef} onSend={handleSend} disabled={isStreamingThisSession} />
+              </div>
+            </>
+          )}
+        </div>
+        {/* WHY: ConversationNav is outside the scroll container — it overlays the right edge
+            and stays visible while messages scroll underneath, acting like a scrollbar
+            enhancement for quick navigation between conversation turns */}
+        {!isEmptyState && (
+          <ConversationNav
+            messages={filteredMessages}
+            isStreaming={isStreamingThisSession}
+            scrollContainerRef={scrollContainerRef}
+          />
+        )}
+      </div>
     </div>
   )
 })

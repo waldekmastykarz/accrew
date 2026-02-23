@@ -56,7 +56,7 @@ export function ConversationNav({ messages, isStreaming, scrollContainerRef }: C
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-  }, [scrollContainerRef])
+  }, [])
 
   if (navMessages.length < 2 && !isStreaming) return null
 
