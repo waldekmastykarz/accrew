@@ -60,44 +60,52 @@ export function ConversationNav({ messages, isStreaming, scrollContainerRef }: C
 
   if (navMessages.length < 2 && !isStreaming) return null
 
+  // WHY: Shape differentiation (Option C) — user messages are small rounded squares,
+  // assistant responses are larger circles. Distinct shapes make roles immediately
+  // distinguishable without needing icons or numbers.
   return (
     <div className="absolute right-4 top-0 bottom-0 z-20 flex items-center pointer-events-none">
-      <div className="flex flex-col items-center pointer-events-auto rounded-full bg-background/60 backdrop-blur-sm px-1 py-2">
+      <div className="flex flex-col items-center pointer-events-auto rounded-full bg-background/60 backdrop-blur-sm px-1.5 py-2.5">
         {navMessages.map((msg, i) => (
           <div key={msg.id} className="flex flex-col items-center">
-            {/* Line connector — longer gap between turns (assistant → user) */}
+            {/* Line connector — wider gap between turns (assistant → user) */}
             {i > 0 && (
               <div className={`w-px ${
-                msg.role === 'user' && navMessages[i - 1]?.role === 'assistant' ? 'h-3' : 'h-1.5'
-              } bg-border/40`} />
+                msg.role === 'user' && navMessages[i - 1]?.role === 'assistant' ? 'h-4' : 'h-2'
+              } bg-border/30`} />
             )}
 
-            <button
-              onClick={() => scrollTo(msg.id)}
-              className={`rounded-full transition-all duration-200 hover:scale-150 ${
-                msg.role === 'user' ? 'w-1.5 h-1.5' : 'w-2 h-2'
-              } ${
-                activeId === msg.id
-                  ? 'bg-foreground ring-2 ring-foreground/20'
-                  : msg.role === 'user'
-                    ? 'bg-muted-foreground/50 hover:bg-muted-foreground'
-                    : 'bg-muted-foreground/30 hover:bg-muted-foreground/60'
-              }`}
-              title={msg.role === 'user'
-                ? `You: ${msg.content.slice(0, 60)}${msg.content.length > 60 ? '...' : ''}`
-                : 'Response'
-              }
-            />
+            {msg.role === 'user' ? (
+              <button
+                onClick={() => scrollTo(msg.id)}
+                className={`w-2 h-2 rounded-sm transition-all duration-200 hover:scale-150 ${
+                  activeId === msg.id
+                    ? 'bg-foreground shadow-[0_0_6px_rgba(255,255,255,0.3)]'
+                    : 'bg-muted-foreground/60 hover:bg-muted-foreground'
+                }`}
+                title={`You: ${msg.content.slice(0, 60)}${msg.content.length > 60 ? '...' : ''}`}
+              />
+            ) : (
+              <button
+                onClick={() => scrollTo(msg.id)}
+                className={`w-3 h-3 rounded-full transition-all duration-200 hover:scale-150 ${
+                  activeId === msg.id
+                    ? 'bg-foreground shadow-[0_0_8px_rgba(255,255,255,0.3)]'
+                    : 'bg-muted-foreground/40 hover:bg-muted-foreground/70'
+                }`}
+                title="Response"
+              />
+            )}
           </div>
         ))}
 
-        {/* Streaming dot */}
+        {/* Streaming dot — pulsing violet circle */}
         {isStreaming && (
           <>
-            <div className="w-px h-1.5 bg-violet-500/30" />
+            <div className="w-px h-2 bg-violet-500/30" />
             <button
               onClick={() => scrollTo('streaming')}
-              className="w-2 h-2 rounded-full bg-violet-500 animate-pulse hover:scale-150 transition-transform"
+              className="w-3 h-3 rounded-full bg-violet-500 animate-pulse hover:scale-150 transition-transform shadow-[0_0_8px_rgba(139,92,246,0.5)]"
               title="Current response"
             />
           </>
