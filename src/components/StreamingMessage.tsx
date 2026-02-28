@@ -30,7 +30,7 @@ export function StreamingMessage({ streaming }: StreamingMessageProps) {
     .filter(line => line.length > 0)
 
   return (
-    <div className="mb-6 border-l-2 border-violet-500 pl-4 ml-1 relative z-10">
+    <div data-message-id="streaming" className="mb-6 border-l-2 border-violet-500 pl-4 ml-1 relative z-10">
       {/* Activity header */}
       <div className="flex items-center gap-2 mb-3">
         <Circle className="w-3 h-3 fill-violet-500 text-violet-500 animate-pulse" />

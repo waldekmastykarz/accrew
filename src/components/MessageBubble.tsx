@@ -17,7 +17,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
   if (isUser) {
     return (
-      <div className="mb-4 flex items-start gap-2">
+      <div data-message-id={message.id} className="mb-4 flex items-start gap-2">
         <Terminal className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
         <p className="text-sm font-medium">{message.content}</p>
       </div>
@@ -25,7 +25,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   }
 
   return (
-    <div className="mb-6 border-l-2 border-muted pl-4 ml-1 relative z-10">
+    <div data-message-id={message.id} className="mb-6 border-l-2 border-muted pl-4 ml-1 relative z-10">
       {/* Thinking - compact */}
       {message.thinking && (
         <ThinkingBlock content={message.thinking} />
