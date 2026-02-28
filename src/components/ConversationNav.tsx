@@ -78,7 +78,7 @@ export function ConversationNav({ messages, isStreaming, scrollContainerRef }: C
             {msg.role === 'user' ? (
               <button
                 onClick={() => scrollTo(msg.id)}
-                className={`w-2 h-2 rounded-sm transition-all duration-200 hover:scale-150 ${
+                className={`w-2 h-2 transition-all duration-200 hover:scale-150 ${
                   activeId === msg.id
                     ? 'bg-foreground shadow-[0_0_6px_rgba(255,255,255,0.3)]'
                     : 'bg-muted-foreground/60 hover:bg-muted-foreground'
