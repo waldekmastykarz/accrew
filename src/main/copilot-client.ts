@@ -1,4 +1,4 @@
-import { CopilotClient as SDKCopilotClient, CopilotSession, type SessionEvent } from '@github/copilot-sdk'
+import { CopilotClient as SDKCopilotClient, CopilotSession, approveAll, type SessionEvent } from '@github/copilot-sdk'
 import { app } from 'electron'
 import { existsSync } from 'fs'
 import path from 'path'
@@ -117,6 +117,7 @@ export class CopilotClient {
     this.session = await Promise.race([
       this.client.createSession({
         model: this.options.model || 'claude-opus-4-5',
+        onPermissionRequest: approveAll,
       }),
       timeout
     ])
