@@ -43,6 +43,13 @@ export interface ChangedFile {
   status: 'created' | 'modified' | 'deleted' | 'untracked'
 }
 
+export interface FileTreeNode {
+  name: string
+  path: string // relative to workspace root
+  type: 'file' | 'directory'
+  children?: FileTreeNode[]
+}
+
 export interface Message {
   id: string
   sessionId: string
@@ -108,4 +115,6 @@ export type IpcChannels = {
   'config:get': void
   'config:set': Partial<Config>
   'file:get-diff': { sessionId: string; messageId: string; filePath: string }
+  'fs:list-files': { path: string }
+  'fs:read-file': { workspacePath: string; filePath: string }
 }

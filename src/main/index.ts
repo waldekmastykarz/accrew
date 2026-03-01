@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, nativeTheme, dialog, Menu, MenuItemConstru
 import electronUpdater from 'electron-updater'
 const { autoUpdater } = electronUpdater
 import path from 'path'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { Database } from './database.js'
 import { AgentManager } from './agent-manager.js'
@@ -12,6 +13,7 @@ import { CopilotClient as SDKCopilotClient } from '@github/copilot-sdk'
 import { getCopilotCliOptions } from './copilot-client.js'
 import { initLogger, debug } from './logger.js'
 import type { Config } from './types.js'
+import type { FileTreeNode } from '../shared/types.js'
 
 // ESM __dirname polyfill
 const __filename = fileURLToPath(import.meta.url)
@@ -107,8 +109,37 @@ async function initializeServices() {
   debug('app', 'Services initialized')
 }
 
+// WHY: Hidden directories (starting with '.') are excluded separately so we don't need
+// to enumerate every possible hidden dir. Named dirs below are non-hidden but still
+// should be excluded because they're generated artifacts or large dependency trees.
+const EXCLUDED_DIR_NAMES = new Set(['node_modules', 'dist', 'build', '.next', '.nuxt', 'out', '__pycache__', '.tox', 'coverage', '.nyc_output', '.turbo'])
+
+async function listFilesRecursively(dirPath: string, relativePath = ''): Promise<FileTreeNode[]> {
+  let entries: fs.Dirent[]
+  try {
+    entries = await fs.promises.readdir(dirPath, { withFileTypes: true })
+  } catch {
+    return []
+  }
+  const nodes: FileTreeNode[] = []
+  for (const entry of entries) {
+    if (entry.name.startsWith('.') && entry.isDirectory()) continue
+    const entryRelPath = relativePath ? `${relativePath}/${entry.name}` : entry.name
+    if (entry.isDirectory()) {
+      if (EXCLUDED_DIR_NAMES.has(entry.name)) continue
+      const children = await listFilesRecursively(path.join(dirPath, entry.name), entryRelPath)
+      nodes.push({ name: entry.name, path: entryRelPath, type: 'directory', children })
+    } else if (entry.isFile()) {
+      nodes.push({ name: entry.name, path: entryRelPath, type: 'file' })
+    }
+  }
+  return nodes.sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
+    return a.name.localeCompare(b.name)
+  })
+}
+
 function setupIpcHandlers() {
-  // Session handlers
   ipcMain.handle('session:create', async (_, args: { workspace?: string; prompt: string; sessionId: string }) => {
     return agentManager.createSession(args.workspace, args.prompt, args.sessionId)
   })
@@ -236,6 +267,24 @@ function setupIpcHandlers() {
 
   ipcMain.handle('git:diff', async (_, args: { path: string; filePath: string }) => {
     return gitManager.getDiff(args.path, args.filePath)
+  })
+
+  // File system handlers
+  ipcMain.handle('fs:list-files', async (_, args: { path: string }) => {
+    return listFilesRecursively(args.path)
+  })
+
+  ipcMain.handle('fs:read-file', async (_, args: { workspacePath: string; filePath: string }) => {
+    // WHY: Validate the resolved path is inside the workspace to prevent path traversal attacks
+    const resolved = path.resolve(args.workspacePath, args.filePath)
+    if (!resolved.startsWith(path.resolve(args.workspacePath) + path.sep) && resolved !== path.resolve(args.workspacePath)) {
+      return null
+    }
+    try {
+      return await fs.promises.readFile(resolved, 'utf-8')
+    } catch {
+      return null
+    }
   })
 }
 

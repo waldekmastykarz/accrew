@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, shell } from 'electron'
 import type { Session, Message, Workspace, Config, WorkspaceMatch, FileChange, ToolCall } from './types.js'
+import type { FileTreeNode } from '../shared/types.js'
 
 export type AccrewAPI = typeof api
 
@@ -63,6 +64,14 @@ const api = {
   file: {
     getDiff: (sessionId: string, messageId: string, filePath: string) =>
       ipcRenderer.invoke('file:get-diff', { sessionId, messageId, filePath }) as Promise<{ oldContent: string; newContent: string }>,
+  },
+
+  // File system operations
+  fs: {
+    listFiles: (path: string) =>
+      ipcRenderer.invoke('fs:list-files', { path }) as Promise<FileTreeNode[]>,
+    readFile: (workspacePath: string, filePath: string) =>
+      ipcRenderer.invoke('fs:read-file', { workspacePath, filePath }) as Promise<string | null>,
   },
 
   // Theme

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Session, Message, Workspace, Config, FileChange, ToolCall, GitInfo, ChangedFile } from './shared/types'
+import type { Session, Message, Workspace, Config, FileChange, ToolCall, GitInfo, ChangedFile, FileTreeNode } from './shared/types'
 
 interface DiffSelection {
   sessionId: string
@@ -24,6 +24,11 @@ interface ChangesPanelState {
   userClosed: boolean
   diffContent: string | null  // Raw git diff string or null
   diffType: 'git' | 'tool' | null  // Source of the diff
+  view: 'changes' | 'all-files'
+  allFilesTree: FileTreeNode[] | null
+  selectedAllFilePath: string | null
+  allFileContent: string | null
+  expanded: boolean
 }
 
 // WHY: pendingOperations tracks async operations that lack UI feedback — used by
@@ -81,6 +86,10 @@ interface Store {
   openChangesPanel: () => Promise<void>
   closeChangesPanel: () => void
   resetUserClosed: () => void
+  setChangesPanelView: (view: 'changes' | 'all-files') => Promise<void>
+  loadAllFiles: (sessionId: string) => Promise<void>
+  selectAllFile: (filePath: string, workspacePath: string) => Promise<void>
+  toggleChangesPanelExpanded: () => void
 
   // Messages
   messages: Message[]
@@ -185,7 +194,7 @@ export const useStore = create<Store>((set, get) => ({
       activeSessionId: id, 
       messages: [], 
       selectedDiff: null,
-      changesPanel: { open: false, files: [], selectedFile: null, userClosed: false, diffContent: null, diffType: null }
+      changesPanel: { open: false, files: [], selectedFile: null, userClosed: false, diffContent: null, diffType: null, view: 'changes', allFilesTree: null, selectedAllFilePath: null, allFileContent: null, expanded: false }
     })
     await window.accrew.session.setViewed(id)
     if (id) {
@@ -363,7 +372,12 @@ export const useStore = create<Store>((set, get) => ({
     selectedFile: null,
     userClosed: false,
     diffContent: null,
-    diffType: null
+    diffType: null,
+    view: 'changes',
+    allFilesTree: null,
+    selectedAllFilePath: null,
+    allFileContent: null,
+    expanded: false
   },
   loadChangedFiles: async (sessionId) => {
     const { sessions, streamingStates, changesPanel } = get()
@@ -525,6 +539,28 @@ export const useStore = create<Store>((set, get) => ({
   })),
   resetUserClosed: () => set((state) => ({
     changesPanel: { ...state.changesPanel, userClosed: false }
+  })),
+  setChangesPanelView: async (view) => {
+    set((state) => ({ changesPanel: { ...state.changesPanel, view } }))
+    if (view === 'all-files') {
+      const { activeSessionId } = get()
+      if (activeSessionId) await get().loadAllFiles(activeSessionId)
+    }
+  },
+  loadAllFiles: async (sessionId) => {
+    const { sessions } = get()
+    const session = sessions.find(s => s.id === sessionId)
+    if (!session?.workspacePath) return
+    const tree = await window.accrew.fs.listFiles(session.workspacePath)
+    set((state) => ({ changesPanel: { ...state.changesPanel, allFilesTree: tree } }))
+  },
+  selectAllFile: async (filePath, workspacePath) => {
+    set((state) => ({ changesPanel: { ...state.changesPanel, selectedAllFilePath: filePath, allFileContent: null } }))
+    const content = await window.accrew.fs.readFile(workspacePath, filePath)
+    set((state) => ({ changesPanel: { ...state.changesPanel, allFileContent: content } }))
+  },
+  toggleChangesPanelExpanded: () => set((state) => ({
+    changesPanel: { ...state.changesPanel, expanded: !state.changesPanel.expanded }
   })),
 
   // Messages
