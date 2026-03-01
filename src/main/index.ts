@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, dialog, Menu, MenuItemConstructorOptions, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, dialog, Menu, MenuItemConstructorOptions, shell, autoUpdater as nativeUpdater } from 'electron'
 import electronUpdater from 'electron-updater'
 const { autoUpdater } = electronUpdater
 import path from 'path'
@@ -328,9 +328,38 @@ app.whenReady().then(async () => {
 
   // Auto-updater (disabled in dev mode)
   if (!isDev) {
-    autoUpdater.checkForUpdatesAndNotify()
+    autoUpdater.logger = {
+      info: (msg: string) => debug('updater', msg),
+      warn: (msg: string) => debug('updater', `WARN: ${msg}`),
+      error: (msg: string) => debug('updater', `ERROR: ${msg}`),
+      debug: (msg: string) => debug('updater', `DEBUG: ${msg}`)
+    }
+    // WHY: autoInstallOnAppQuit=true ensures update installs even if user
+    // clicks "Later" — next normal app quit will apply it
+    autoUpdater.autoInstallOnAppQuit = true
+
+    autoUpdater.on('checking-for-update', () => {
+      debug('updater', 'Checking for update...')
+    })
+
+    autoUpdater.on('update-available', (info) => {
+      debug('updater', 'Update available', { version: info.version })
+    })
+
+    autoUpdater.on('update-not-available', (info) => {
+      debug('updater', 'No update available', { version: info.version })
+    })
+
+    autoUpdater.on('download-progress', (progress) => {
+      debug('updater', 'Download progress', { percent: Math.round(progress.percent) })
+    })
+
+    autoUpdater.on('error', (err) => {
+      debug('updater', 'Update error', { message: err.message, stack: err.stack })
+    })
 
     autoUpdater.on('update-downloaded', (info) => {
+      debug('updater', 'Update downloaded', { version: info.version })
       dialog.showMessageBox({
         type: 'info',
         title: 'Update Ready',
@@ -338,10 +367,32 @@ app.whenReady().then(async () => {
         buttons: ['Restart', 'Later']
       }).then((result) => {
         if (result.response === 0) {
+          debug('updater', 'User chose Restart — calling quitAndInstall')
+          // WHY: On macOS (Finder-launched), quitAndInstall() calls app.quit() which
+          // triggers before-quit — cleanup handlers there (stopAll, db.close) can block
+          // the quit. Fix per electron-builder#8997: remove before-quit, close windows,
+          // do cleanup in native before-quit-for-update, and call app.exit() to force-kill.
+          if (process.platform === 'darwin') {
+            app.removeAllListeners('before-quit')
+            BrowserWindow.getAllWindows().forEach((win) => {
+              if (!win.isDestroyed()) {
+                win.removeAllListeners('close')
+                win.close()
+              }
+            })
+            nativeUpdater.once('before-quit-for-update', () => {
+              debug('updater', 'before-quit-for-update — cleaning up and exiting')
+              agentManager?.stopAll()
+              database?.close()
+              app.exit()
+            })
+          }
           autoUpdater.quitAndInstall()
         }
       })
     })
+
+    autoUpdater.checkForUpdatesAndNotify()
   }
 
   app.on('activate', () => {
