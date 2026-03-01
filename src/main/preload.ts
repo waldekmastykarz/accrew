@@ -1,6 +1,5 @@
 import { contextBridge, ipcRenderer, shell } from 'electron'
-import type { Session, Message, Workspace, Config, WorkspaceMatch, FileChange, ToolCall } from './types.js'
-import type { FileTreeNode } from '../shared/types.js'
+import type { Session, Message, Workspace, Config, WorkspaceMatch, FileChange, ToolCall, FileTreeNode } from './types.js'
 
 export type AccrewAPI = typeof api
 

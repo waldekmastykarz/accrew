@@ -12,8 +12,7 @@ import { GitManager } from './git-manager.js'
 import { CopilotClient as SDKCopilotClient } from '@github/copilot-sdk'
 import { getCopilotCliOptions } from './copilot-client.js'
 import { initLogger, debug } from './logger.js'
-import type { Config } from './types.js'
-import type { FileTreeNode } from '../shared/types.js'
+import type { Config, FileTreeNode } from './types.js'
 
 // ESM __dirname polyfill
 const __filename = fileURLToPath(import.meta.url)

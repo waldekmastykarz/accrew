@@ -66,6 +66,13 @@ export interface WorkspaceMatch {
   reason: string
 }
 
+export interface FileTreeNode {
+  name: string
+  path: string // relative to workspace root
+  type: 'file' | 'directory'
+  children?: FileTreeNode[]
+}
+
 // IPC Channel types
 export type IpcChannels = {
   // Main -> Renderer
