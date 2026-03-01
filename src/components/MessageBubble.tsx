@@ -19,7 +19,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     return (
       <div data-message-id={message.id} data-message-role={message.role} className="mb-4 flex items-start gap-2">
         <Terminal className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-        <p className="text-sm font-medium">{message.content}</p>
+        {/* WHY: whitespace-pre-wrap preserves line breaks entered by the user in the input box */}
+        <p className="text-sm font-medium whitespace-pre-wrap">{message.content}</p>
       </div>
     )
   }
