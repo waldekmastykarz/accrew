@@ -62,6 +62,14 @@ const api = {
       ipcRenderer.invoke('file:get-diff', { sessionId, messageId, filePath }),
   },
 
+  // File system operations
+  fs: {
+    listFiles: (path) =>
+      ipcRenderer.invoke('fs:list-files', { path }),
+    readFile: (workspacePath, filePath) =>
+      ipcRenderer.invoke('fs:read-file', { workspacePath, filePath }),
+  },
+
   // Git operations
   git: {
     isRepo: (path) =>
