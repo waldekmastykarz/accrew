@@ -1,2 +1,2 @@
 // Shared types between main and renderer
-export {};
+export const STREAMING_MESSAGE_ID = 'streaming'

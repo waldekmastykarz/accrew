@@ -4,11 +4,14 @@ import { MessageBubble } from './MessageBubble'
 import { StreamingMessage } from './StreamingMessage'
 import { PromptInput, PromptInputHandle } from './PromptInput'
 import { ConversationNav } from './ConversationNav'
+import { STREAMING_MESSAGE_ID } from '../shared/types'
 import { Circle, GitBranch, FileDiff } from 'lucide-react'
 
 export interface ChatPaneHandle {
   focusInput: () => void
   scrollToBottom: () => void
+  navigateToPreviousMessage: () => void
+  navigateToNextMessage: () => void
 }
 
 export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
@@ -38,7 +41,42 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     focusInput: () => promptInputRef.current?.focus(),
-    scrollToBottom: () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    scrollToBottom: () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }),
+    // WHY: Navigate between user messages only — assistant/thinking blocks are not
+    // navigation targets. Users think in terms of "what did I ask?" not "what did it say?".
+    // WHY: Manual scrollTo with -24px offset instead of scrollIntoView — gives breathing
+    // room above the target message so it doesn't feel pinned to the top edge.
+    navigateToPreviousMessage: () => {
+      const container = scrollContainerRef.current
+      if (!container) return
+      const els = Array.from(container.querySelectorAll('[data-message-id][data-message-role="user"]'))
+      if (els.length === 0) return
+      const containerTop = container.getBoundingClientRect().top
+      for (let i = els.length - 1; i >= 0; i--) {
+        if (els[i].getBoundingClientRect().top < containerTop - 20) {
+          const elRect = els[i].getBoundingClientRect()
+          const scrollTop = container.scrollTop + (elRect.top - containerTop) - 24
+          container.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' })
+          return
+        }
+      }
+    },
+    navigateToNextMessage: () => {
+      const container = scrollContainerRef.current
+      if (!container) return
+      const els = Array.from(container.querySelectorAll('[data-message-id][data-message-role="user"]'))
+      if (els.length === 0) return
+      const containerTop = container.getBoundingClientRect().top
+      // WHY: Threshold must be larger than the 24px scroll offset — otherwise after
+      // landing a message at +24px, the finder re-matches the current message and
+      // scrolls to the same spot (appearing to do nothing on repeated presses).
+      const targetIdx = els.findIndex(el => el.getBoundingClientRect().top > containerTop + 40)
+      if (targetIdx >= 0) {
+        const elRect = els[targetIdx].getBoundingClientRect()
+        const scrollTop = container.scrollTop + (elRect.top - containerTop) - 24
+        container.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' })
+      }
+    }
   }), [])
 
   // Get streaming state for the current session - directly from Map for content display
@@ -51,7 +89,7 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
   // disrupting manual scrolling while the user reads the response.
   useEffect(() => {
     if (currentStreaming && !hasScrolledToStreamingRef.current) {
-      const el = scrollContainerRef.current?.querySelector('[data-message-id="streaming"]')
+      const el = scrollContainerRef.current?.querySelector(`[data-message-id="${STREAMING_MESSAGE_ID}"]`)
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' })
         hasScrolledToStreamingRef.current = true
@@ -62,14 +100,18 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
     }
   }, [currentStreaming])
 
-  // WHY: Scroll to the start of the last message when new messages arrive — keeps the
-  // beginning of the response visible instead of scrolling past it to the bottom.
+  // WHY: Only auto-scroll for completed assistant messages — user messages don't need
+  // scrolling (user just typed them), and streaming has its own scroll-to-start effect.
+  // Without this guard, sending a message causes a double-scroll: once to the user
+  // message, then again to the streaming start.
   useEffect(() => {
     if (messages.length > 0) {
       const lastMsg = messages[messages.length - 1]
-      const el = scrollContainerRef.current?.querySelector(`[data-message-id="${lastMsg.id}"]`)
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      if (lastMsg.role === 'assistant' && !currentStreaming) {
+        const el = scrollContainerRef.current?.querySelector(`[data-message-id="${lastMsg.id}"]`)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
       }
     }
   }, [messages.length])
@@ -182,7 +224,9 @@ export const ChatPane = forwardRef<ChatPaneHandle>(function ChatPane(_, ref) {
             </div>
           ) : (
             <>
-              <div className="flex-1 py-6 px-8">
+              {/* WHY: pr-16 creates clear air between message text and the conversation
+                  nav line (positioned at right-6). Without it, text crowds the nav. */}
+              <div className="flex-1 py-6 pl-8 pr-16">
                 {filteredMessages.map((message) => (
                   <MessageBubble key={message.id} message={message} />
                 ))}

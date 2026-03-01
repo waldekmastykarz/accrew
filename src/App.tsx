@@ -198,6 +198,20 @@ export default function App() {
       return
     }
 
+    // Cmd+↑: Previous message in conversation
+    if (e.metaKey && e.key === 'ArrowUp') {
+      e.preventDefault()
+      chatPaneRef.current?.navigateToPreviousMessage()
+      return
+    }
+
+    // Cmd+↓: Next message in conversation
+    if (e.metaKey && e.key === 'ArrowDown') {
+      e.preventDefault()
+      chatPaneRef.current?.navigateToNextMessage()
+      return
+    }
+
     // Cmd+Shift+R: Refresh changes
     if (e.metaKey && e.shiftKey && e.key === 'r' && activeSessionId) {
       e.preventDefault()

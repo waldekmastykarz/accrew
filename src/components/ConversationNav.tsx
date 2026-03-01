@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { Message } from '../shared/types'
+import { STREAMING_MESSAGE_ID } from '../shared/types'
 
 interface ConversationNavProps {
   messages: Message[]
@@ -7,19 +8,64 @@ interface ConversationNavProps {
   scrollContainerRef: React.RefObject<HTMLDivElement | null>
 }
 
-// WHY: Metro-line style navigation — vertical timeline with clickable dots for each message.
-// Positioned as an overlay on the right side of the chat, outside the scroll container,
-// so it stays visible while messages scroll underneath.
+// WHY: Always-visible timeline — only user messages (instructions) get dots, connected by
+// a single thin line. No markers for responses. User prompts are the natural bookmarks
+// ("where did I ask about X?"), and the gap between dots implicitly shows how long each
+// response was. Always visible for orientation; dots clickable for navigation.
 export function ConversationNav({ messages, isStreaming, scrollContainerRef }: ConversationNavProps) {
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [positions, setPositions] = useState<Map<string, number>>(new Map())
   const observerRef = useRef<IntersectionObserver | null>(null)
+  const rafRef = useRef<number>(0)
 
-  // Only user and assistant messages (skip system)
-  const navMessages = messages.filter(m => m.role === 'user' || m.role === 'assistant')
+  // WHY: Only user messages get dots — assistant messages still tracked for position
+  // calculation and active-state detection (so the line knows where to end).
+  const userMessages = useMemo(() => messages.filter(m => m.role === 'user'), [messages])
+  const allNavMessages = useMemo(() => messages.filter(m => m.role === 'user' || m.role === 'assistant'), [messages])
 
-  // WHY: IntersectionObserver with top-biased rootMargin — tracks which message is at
-  // the top of the viewport to highlight the corresponding nav dot. Without the bias,
-  // multiple messages show as "active" simultaneously.
+  // WHY: Calculate marker positions proportionally — each marker's top% = message element's
+  // offset / scrollHeight. ResizeObserver catches content growth (streaming), new messages,
+  // and window resizes. Debounced with rAF to avoid layout thrashing during rapid streaming.
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const recalculate = () => {
+      const { scrollHeight } = container
+      if (scrollHeight === 0) return
+
+      const newPositions = new Map<string, number>()
+      const containerRect = container.getBoundingClientRect()
+      const els = container.querySelectorAll('[data-message-id]')
+      els.forEach(el => {
+        const id = el.getAttribute('data-message-id')
+        if (id) {
+          const elRect = el.getBoundingClientRect()
+          const offsetTop = elRect.top - containerRect.top + container.scrollTop
+          newPositions.set(id, (offsetTop / scrollHeight) * 100)
+        }
+      })
+      setPositions(newPositions)
+    }
+
+    const debouncedRecalculate = () => {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(recalculate)
+    }
+
+    const resizeObserver = new ResizeObserver(debouncedRecalculate)
+    resizeObserver.observe(container)
+    recalculate()
+
+    return () => {
+      resizeObserver.disconnect()
+      cancelAnimationFrame(rafRef.current)
+    }
+  }, [allNavMessages.length, isStreaming, scrollContainerRef])
+
+  // WHY: IntersectionObserver tracks all messages (not just user) so the active state
+  // reflects what's currently visible. When an assistant response is on screen, the
+  // nearest preceding user dot highlights.
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
@@ -49,68 +95,107 @@ export function ConversationNav({ messages, isStreaming, scrollContainerRef }: C
 
     observerRef.current = observer
     return () => observer.disconnect()
-  }, [navMessages.length, isStreaming, scrollContainerRef])
+  }, [allNavMessages.length, isStreaming, scrollContainerRef])
 
+  // WHY: messageId is always a UUID from SQLite or STREAMING_MESSAGE_ID — safe for querySelector.
+  // WHY: Manual scrollTo with -24px offset instead of scrollIntoView — scrollIntoView
+  // pins the element flush to the top edge, which feels cramped. The offset gives
+  // breathing room so you see a bit of the previous context above.
   const scrollTo = useCallback((messageId: string) => {
-    const el = scrollContainerRef.current?.querySelector(`[data-message-id="${messageId}"]`)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const container = scrollContainerRef.current
+    const el = container?.querySelector(`[data-message-id="${messageId}"]`)
+    if (el && container) {
+      const elRect = el.getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+      const scrollTop = container.scrollTop + (elRect.top - containerRect.top) - 24
+      container.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' })
     }
-  }, [])
+  }, [scrollContainerRef])
 
-  if (navMessages.length < 2 && !isStreaming) return null
+  if (userMessages.length < 2 && !isStreaming) return null
 
-  // WHY: Shape differentiation (Option C) — user messages are small rounded squares,
-  // assistant responses are larger circles. Distinct shapes make roles immediately
-  // distinguishable without needing icons or numbers.
+  const getTooltip = (msg: Message): string => {
+    const text = msg.content
+    const truncated = text.slice(0, 80)
+    return truncated + (text.length > 80 ? '…' : '')
+  }
+
+  // WHY: Resolve active dot — if the visible message is an assistant response,
+  // highlight its preceding user dot instead. This way the dot always represents
+  // the turn you're currently reading.
+  const getActiveDotId = (): string | null => {
+    if (!activeId) return null
+    const activeMsg = allNavMessages.find(m => m.id === activeId)
+    if (!activeMsg) return null
+    if (activeMsg.role === 'user') return activeMsg.id
+    // Find the user message that precedes this assistant response
+    const idx = allNavMessages.indexOf(activeMsg)
+    for (let i = idx - 1; i >= 0; i--) {
+      if (allNavMessages[i].role === 'user') return allNavMessages[i].id
+    }
+    return null
+  }
+  const activeDotId = getActiveDotId()
+
+  // WHY: Dot positions for the connecting line — line runs from first to last user dot.
+  // Using SVG for the line so it can be a clean 1px stroke without box-model headaches.
+  const dotPositions = userMessages
+    .map(m => positions.get(m.id))
+    .filter((p): p is number => p !== undefined)
+
+  // WHY: Line and dots use bg-border — a fully opaque solid color from the theme.
+  // Never use opacity modifiers (like /30) here — semi-transparent dots let the
+  // line bleed through, creating a visible overlap artifact.
+  const solidColor = 'bg-border'
+
   return (
-    <div className="absolute right-4 top-0 bottom-0 z-20 flex items-center pointer-events-none">
-      <div className="flex flex-col items-center pointer-events-auto rounded-full bg-background/60 backdrop-blur-sm px-1.5 py-2.5">
-        {navMessages.map((msg, i) => (
-          <div key={msg.id} className="flex flex-col items-center">
-            {/* Line connector — wider gap between turns (assistant → user) */}
-            {i > 0 && (
-              <div className={`w-px ${
-                msg.role === 'user' && navMessages[i - 1]?.role === 'assistant' ? 'h-4' : 'h-2'
-              } bg-border/30`} />
-            )}
+    // WHY: right-6 (24px) gives breathing room from window edge / sidebar.
+    // Messages use pr-16 (64px), so there's ~24px clear air between text and nav.
+    <div className="absolute right-6 top-0 bottom-0 z-20 w-4">
+      {/* Connecting line — solid, same color as dots */}
+      {dotPositions.length >= 2 && (
+        <div
+          className={`absolute left-[7.5px] w-px ${solidColor}`}
+          style={{
+            top: `${dotPositions[0]}%`,
+            bottom: `${100 - dotPositions[dotPositions.length - 1]}%`
+          }}
+        />
+      )}
 
-            {msg.role === 'user' ? (
-              <button
-                onClick={() => scrollTo(msg.id)}
-                className={`w-2 h-2 transition-all duration-200 hover:scale-150 ${
-                  activeId === msg.id
-                    ? 'bg-foreground shadow-[0_0_6px_rgba(255,255,255,0.3)]'
-                    : 'bg-muted-foreground/60 hover:bg-muted-foreground'
-                }`}
-                title={`You: ${msg.content.slice(0, 60)}${msg.content.length > 60 ? '...' : ''}`}
-              />
-            ) : (
-              <button
-                onClick={() => scrollTo(msg.id)}
-                className={`w-3 h-3 rounded-full transition-all duration-200 hover:scale-150 ${
-                  activeId === msg.id
-                    ? 'bg-foreground shadow-[0_0_8px_rgba(255,255,255,0.3)]'
-                    : 'bg-muted-foreground/40 hover:bg-muted-foreground/70'
-                }`}
-                title="Response"
-              />
-            )}
-          </div>
-        ))}
+      {/* User message dots — solid, same color as line */}
+      {userMessages.map(msg => {
+        const pos = positions.get(msg.id)
+        if (pos === undefined) return null
+        const isActive = activeDotId === msg.id
 
-        {/* Streaming dot — pulsing violet circle */}
-        {isStreaming && (
-          <>
-            <div className="w-px h-2 bg-violet-500/30" />
-            <button
-              onClick={() => scrollTo('streaming')}
-              className="w-3 h-3 rounded-full bg-violet-500 animate-pulse hover:scale-150 transition-transform shadow-[0_0_8px_rgba(139,92,246,0.5)]"
-              title="Current response"
-            />
-          </>
-        )}
-      </div>
+        return (
+          <button
+            key={msg.id}
+            onClick={() => scrollTo(msg.id)}
+            className={`absolute pointer-events-auto cursor-pointer rounded-full transition-all duration-200 ${solidColor} ${
+              isActive
+                ? 'w-2.5 h-2.5 left-[3px]'
+                : 'w-1.5 h-1.5 left-[5px] hover:scale-150'
+            }`}
+            style={{ top: `${pos}%`, transform: 'translateY(-50%)' }}
+            title={getTooltip(msg)}
+          />
+        )
+      })}
+
+      {/* Streaming indicator — subtle pulsing dot */}
+      {isStreaming && (() => {
+        const pos = positions.get(STREAMING_MESSAGE_ID)
+        if (pos === undefined) return null
+        return (
+          <div
+            className="absolute left-[4px] w-2 h-2 rounded-full bg-violet-500/50 animate-pulse"
+            style={{ top: `${pos}%`, transform: 'translateY(-50%)' }}
+            title="Streaming…"
+          />
+        )
+      })()}
     </div>
   )
 }
