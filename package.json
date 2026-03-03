@@ -39,7 +39,7 @@
     "clsx": "^2.1.1",
     "electron-updater": "^6.7.3",
     "jdenticon": "^3.3.0",
-    "lucide-react": "^0.575.0",
+    "lucide-react": "^0.576.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
