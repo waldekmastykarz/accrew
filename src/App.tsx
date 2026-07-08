@@ -324,15 +324,15 @@ export default function App() {
       </div>
       
       {/* Main chat area */}
-      <div className="flex-1 min-w-0 w-full">
+      <div className={`flex-1 min-w-0 w-full ${changesPanel.open && changesPanel.expanded ? 'hidden' : ''}`}>
         <ChatPane ref={chatPaneRef} />
       </div>
       
       {/* Changes panel */}
       {changesPanel.open && (
         <div 
-          className="flex-shrink-0 border-l border-border relative"
-          style={{ width: localChangesPanelWidth }}
+          className={`flex-shrink-0 border-l border-border relative ${changesPanel.expanded ? 'flex-1' : ''}`}
+          style={changesPanel.expanded ? undefined : { width: localChangesPanelWidth }}
         >
           {/* Resize handle - on left side */}
           <div
